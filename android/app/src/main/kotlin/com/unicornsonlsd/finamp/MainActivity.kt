@@ -16,10 +16,18 @@ import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.io.File
+import java.security.KeyStore
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
 
 class MainActivity : AudioServiceActivity() {
     companion object {
+        private const val CLIENT_CERT_CHANNEL = "com.unicornsonlsd.finamp/client_certificate"
+        private const val CLIENT_CERT_CHANNEL_LOG_TAG = "ClientCertChannel"
+
         private const val DOWNLOADS_SERVICE_CHANNEL = "com.unicornsonlsd.finamp/downloads_service"
         private const val DOWNLOADS_SERVICE_CHANNEL_LOG_TAG = "DownloadsServiceChannel"
 
@@ -37,6 +45,63 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            CLIENT_CERT_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "installClientCertificate" -> {
+                    val bytes = call.argument<ByteArray>("bytes")
+                    val password = call.argument<String>("password")
+                    if (bytes == null || password == null) {
+                        result.error("INVALID_ARGS", "bytes and password are required", null)
+                        return@setMethodCallHandler
+                    }
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) {
+                            try {
+                                installClientCertificate(bytes, password)
+
+                                Log.i(
+                                    CLIENT_CERT_CHANNEL_LOG_TAG,
+                                    "Client certificate installed in Android SSL context"
+                                )
+                                result.success(null)
+                            } catch (e: Exception) {
+                                Log.e(
+                                    CLIENT_CERT_CHANNEL_LOG_TAG,
+                                    "Failed to install client certificate",
+                                    e
+                                )
+                                result.error("CERT_ERROR", e.message, null)
+                            }
+                        }
+                    }
+                }
+                "clearClientCertificate" -> {
+                    lifecycleScope.launch {
+                        withContext(Dispatchers.IO) {
+                            try {
+                                clearClientCertificate()
+
+                                Log.i(
+                                    CLIENT_CERT_CHANNEL_LOG_TAG,
+                                    "Client certificate cleared from Android SSL context"
+                                )
+                                result.success(null)
+                            } catch (e: Exception) {
+                                Log.e(CLIENT_CERT_CHANNEL_LOG_TAG, "Failed to clear client certificate", e)
+                                result.error("CERT_ERROR", e.message, null)
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    Log.e(CLIENT_CERT_CHANNEL_LOG_TAG, "Method not found: '${call.method}'")
+                    result.notImplemented()
+                }
+            }
+        }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             DOWNLOADS_SERVICE_CHANNEL,
@@ -122,6 +187,27 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
         }
+    }
+
+    private fun installClientCertificate(bytes: ByteArray, password: String) {
+        val keyStore = KeyStore.getInstance("PKCS12")
+        keyStore.load(ByteArrayInputStream(bytes), password.toCharArray())
+
+        val keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
+        keyManagerFactory.init(keyStore, password.toCharArray())
+
+        val sslContext = SSLContext.getInstance("TLS")
+        sslContext.init(keyManagerFactory.keyManagers, null, null)
+
+        SSLContext.setDefault(sslContext)
+        HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.socketFactory)
+    }
+
+    private fun clearClientCertificate() {
+        val defaultContext = SSLContext.getInstance("TLS")
+        defaultContext.init(null, null, null)
+        SSLContext.setDefault(defaultContext)
+        HttpsURLConnection.setDefaultSSLSocketFactory(defaultContext.socketFactory)
     }
 
     /**
