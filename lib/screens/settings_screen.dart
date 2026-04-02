@@ -1,10 +1,11 @@
+import 'package:finamp/components/finamp_icon.dart';
 import 'package:finamp/l10n/app_localizations.dart';
+import 'package:finamp/menus/client_certificate_authentication_menu.dart';
 import 'package:finamp/menus/quick_connect_authorization_menu.dart';
 import 'package:finamp/menus/server_sharing_menu.dart';
 import 'package:finamp/screens/accessibility_settings_screen.dart';
 import 'package:finamp/screens/interaction_settings_screen.dart';
 import 'package:finamp/screens/network_settings_screen.dart';
-import 'package:finamp/components/finamp_icon.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -20,14 +21,16 @@ import 'audio_service_settings_screen.dart';
 import 'downloads_settings_screen.dart';
 import 'language_selection_screen.dart';
 import 'layout_settings_screen.dart';
+import 'playback_reporting_settings_screen.dart';
 import 'transcoding_settings_screen.dart';
 import 'view_selector.dart';
 import 'volume_normalization_settings_screen.dart';
-import 'playback_reporting_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
+
   static const routeName = "/settings";
+
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
@@ -201,6 +204,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             leading: Icon(TablerIcons.lock_bolt),
             title: Text(AppLocalizations.of(context)!.quickConnectAuthorizationMenuButtonTitle),
             onTap: () => showQuickConnectAuthorizationMenu(context: context),
+          ),
+          ListTile(
+            leading: Icon(TablerIcons.certificate),
+            title: Text(AppLocalizations.of(context)!.clientCertificate),
+            subtitle: Text(
+              ref.watch(finampSettingsProvider.clientCertificate) != null
+                  ? AppLocalizations.of(context)!.clientCertificateInstalled
+                  : AppLocalizations.of(context)!.clientCertificateUnavailable,
+            ),
+            onTap: () => showClientCertificateMenu(context: context),
           ),
           const LogoutListTile(),
         ],
