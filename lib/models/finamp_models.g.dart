@@ -462,13 +462,14 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
       ..radioEnabled = fields[140] == null ? false : fields[140] as bool
       ..radioMode = fields[141] == null
           ? RadioMode.similar
-          : fields[141] as RadioMode;
+          : fields[141] as RadioMode
+      ..clientCertificate = fields[146] as ClientCertificate?;
   }
 
   @override
   void write(BinaryWriter writer, FinampSettings obj) {
     writer
-      ..writeByte(139)
+      ..writeByte(140)
       ..writeByte(0)
       ..write(obj.isOffline)
       ..writeByte(1)
@@ -746,7 +747,9 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
       ..writeByte(144)
       ..write(obj.multichannelHandlingSetting)
       ..writeByte(145)
-      ..write(obj.previousTracksPersistenceMode);
+      ..write(obj.previousTracksPersistenceMode)
+      ..writeByte(146)
+      ..write(obj.clientCertificate);
   }
 
   @override
@@ -1570,6 +1573,43 @@ class FinampStorableQueueInfoAdapter
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is FinampStorableQueueInfoAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class ClientCertificateAdapter extends TypeAdapter<ClientCertificate> {
+  @override
+  final typeId = 113;
+
+  @override
+  ClientCertificate read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return ClientCertificate(
+      data: fields[0] as Uint8List,
+      password: fields[1] as String,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, ClientCertificate obj) {
+    writer
+      ..writeByte(2)
+      ..writeByte(0)
+      ..write(obj.data)
+      ..writeByte(1)
+      ..write(obj.password);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ClientCertificateAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

@@ -249,6 +249,7 @@ class DefaultSettings {
   static const duckOnAudioInterruption = true;
   static const forceAudioOffloadingOnAndroid = false;
   static const previousTracksPersistenceMode = PreviousTracksPersistenceMode.persistent;
+  static const ClientCertificate? clientCertificate = null;
 }
 
 @HiveType(typeId: 28)
@@ -846,6 +847,9 @@ class FinampSettings {
 
   @HiveField(145, defaultValue: DefaultSettings.previousTracksPersistenceMode)
   PreviousTracksPersistenceMode previousTracksPersistenceMode = DefaultSettings.previousTracksPersistenceMode;
+
+  @HiveField(146, defaultValue: DefaultSettings.clientCertificate)
+  ClientCertificate? clientCertificate = DefaultSettings.clientCertificate;
 
   static Future<FinampSettings> create() async {
     final downloadLocation = await DownloadLocation.create(
@@ -4003,4 +4007,15 @@ enum PreviousTracksPersistenceMode {
   /// Override state to be expanded on open
   @HiveField(2)
   initiallyExpanded,
+}
+
+@HiveType(typeId: 113)
+class ClientCertificate {
+  ClientCertificate({required this.data, required this.password});
+
+  @HiveField(0)
+  final Uint8List data;
+
+  @HiveField(1)
+  final String password;
 }
