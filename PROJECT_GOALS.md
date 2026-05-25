@@ -239,7 +239,7 @@ Wire the new Subsonic services into the live app so playback and browsing actual
 - [x] `view_selector.dart` — replaced `getViews()` with `SubsonicApiHelper.getMusicFolders()`; logout now calls `SubsonicUserHelper.clearSessionAndSave()`
 - [x] `metadata_provider.dart` — synthesizes `PlaybackInfoResponse`/`MediaSourceInfo` from `SubsonicChild` fields stored in `BaseItemDto.mediaSources` by `_childToDto`; fetches lyrics via `getLyricsAsDto()` → `LyricDto`; no server round-trip for basic playback metadata
 - [x] `playback_history_service.dart` — replaced Jellyfin session endpoints with `SubsonicApiHelper.scrobble()`; `submission: false` for now-playing, `submission: true` for track completion
-- [ ] `music_player_background_task.dart` — swap stream URL construction (Jellyfin `getAudioStreamUrl` → `SubsonicApiHelper.getStreamUrl()`)
+- [x] `music_player_background_task.dart` — `_trackUri()` replaced: direct play → `getStreamUrl(item)` (original file); transcode → `getStreamUrl(item, format: subsonicFormat, maxBitRate: kbps)`; `FinampTranscodingStreamingFormat.codec` maps directly to Subsonic format names (vorbis → "ogg")
 - [ ] `downloads_service.dart` — swap download URL construction
 
 ### Phase 6 — Branding

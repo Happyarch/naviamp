@@ -11,8 +11,8 @@ import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/jellyfin_models.dart' as jellyfin_models;
 import 'package:finamp/services/current_track_metadata_provider.dart';
 import 'package:finamp/services/favorite_provider.dart';
-import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/playback_history_service.dart';
+import 'package:finamp/services/subsonic_api_helper.dart';
 import 'package:finamp/services/queue_service.dart';
 import 'package:finamp/services/radio_service_helper.dart' as RadioServiceHelper;
 import 'package:flutter/foundation.dart';
@@ -1348,61 +1348,30 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   }
 
   Future<Uri> _trackUri(MediaItem mediaItem) async {
-    final finampUserHelper = GetIt.instance<FinampUserHelper>();
-    // When creating the MediaItem (usually in AudioServiceHelper), we specify
-    // whether or not to transcode. We used to pull from FinampSettings here,
-    // but since audio_service runs in an isolate (or at least, it does until
-    // 0.18), the value would be wrong if changed while a track was playing since
-    // Hive is bad at multi-isolate stuff.
-
-    final parsedBaseUrl = Uri.parse(finampUserHelper.currentUser!.baseURL);
-
-    List<String> builtPath = List.from(parsedBaseUrl.pathSegments);
-
-    Map<String, String> queryParameters = Map.from(parsedBaseUrl.queryParameters);
-
-    // We include the user token as a query parameter because just_audio used to
-    // have issues with headers in HLS, and this solution still works fine
-    queryParameters["ApiKey"] = finampUserHelper.currentUser!.accessToken;
-    // // indicate which play session this stream belongs to, this will be referenced when reporting playback progress
-    // queryParameters["PlaySessionId"] = _order.id; //!!! this currently breaks transcoding for some reason
+    final subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
+    final item = jellyfin_models.BaseItemDto.fromJson(
+      mediaItem.extras!["itemJson"] as Map<String, dynamic>,
+    );
 
     if (mediaItem.extras!["shouldTranscode"] as bool) {
-      builtPath.addAll(["Audio", mediaItem.extras!["itemJson"]["Id"] as String, "main.m3u8"]);
-
-      queryParameters.addAll({
-        "audioCodec": FinampSettingsHelper.finampSettings.transcodingStreamingFormat.codec,
-        "playSessionId": mediaItem.extras!["playSessionId"] as String? ?? "",
-        // Ideally we'd switch between 44.1/48kHz depending on the source is,
-        // realistically it doesn't matter too much
-        // default to 44100, only use 48000 for opus because opus doesn't support 44100
-        "audioSampleRate": FinampSettingsHelper.finampSettings.transcodingStreamingFormat.sampleRate.toString(),
-        "segmentContainer": FinampSettingsHelper.finampSettings.transcodingStreamingFormat.container,
-      });
-
-      if (!FinampSettingsHelper.finampSettings.transcodingStreamingFormat.lossless) {
-        queryParameters.addAll({"audioBitRate": FinampSettingsHelper.finampSettings.transcodeBitrate.toString()});
-      }
-
-      if (FinampSettingsHelper.finampSettings.multichannelHandlingSetting ==
-              MultichannelHandlingSetting.stereoDownmixAll ||
-          (FinampSettingsHelper.finampSettings.multichannelHandlingSetting ==
-                  MultichannelHandlingSetting.stereoDownmixLossy &&
-              FinampSettingsHelper.finampSettings.transcodingStreamingFormat.codec != "flac")) {
-        queryParameters.addAll({"maxAudioChannels": "2"});
-      }
+      final fmt = FinampSettingsHelper.finampSettings.transcodingStreamingFormat;
+      // Map FinampTranscodingStreamingFormat codec names to Subsonic format param.
+      // Subsonic uses "ogg" for both vorbis and opus-in-ogg; all others match directly.
+      final format = switch (fmt) {
+        FinampTranscodingStreamingFormat.vorbisMpegTS ||
+        FinampTranscodingStreamingFormat.vorbisFragmentedMp4 => 'ogg',
+        _ => fmt.codec, // 'aac', 'opus', 'flac' match Subsonic format names
+      };
+      // Subsonic maxBitRate is kbps; FinampSettings.transcodeBitrate is bps.
+      // Omit for lossless — Navidrome ignores it for FLAC anyway.
+      final maxBitRateKbps = fmt.lossless
+          ? null
+          : FinampSettingsHelper.finampSettings.transcodeBitrate ~/ 1000;
+      return subsonicApiHelper.getStreamUrl(item, format: format, maxBitRate: maxBitRateKbps);
     } else {
-      builtPath.addAll(["Items", mediaItem.extras!["itemJson"]["Id"] as String, "File"]);
+      // No format/bitrate = Navidrome serves the original file as-is.
+      return subsonicApiHelper.getStreamUrl(item);
     }
-
-    return Uri(
-      host: parsedBaseUrl.host,
-      port: parsedBaseUrl.port,
-      scheme: parsedBaseUrl.scheme,
-      userInfo: parsedBaseUrl.userInfo,
-      pathSegments: builtPath,
-      queryParameters: queryParameters,
-    );
   }
 
   @override
