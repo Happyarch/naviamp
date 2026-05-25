@@ -7,7 +7,8 @@ import '../components/ViewSelector/no_music_libraries_message.dart';
 import '../components/global_snackbar.dart';
 import '../models/jellyfin_models.dart';
 import '../services/finamp_user_helper.dart';
-import '../services/jellyfin_api_helper.dart';
+import '../services/subsonic_api_helper.dart';
+import '../services/subsonic_user_helper.dart';
 import 'music_screen.dart';
 
 class ViewSelector extends StatefulWidget {
@@ -20,7 +21,7 @@ class ViewSelector extends StatefulWidget {
 }
 
 class _ViewSelectorState extends State<ViewSelector> {
-  final _jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
+  final _subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
   late Future<List<BaseItemDto>> viewListFuture;
   final Map<BaseItemDto, bool> _views = {};
@@ -29,7 +30,7 @@ class _ViewSelectorState extends State<ViewSelector> {
   @override
   void initState() {
     super.initState();
-    viewListFuture = _jellyfinApiHelper.getViews();
+    viewListFuture = _subsonicApiHelper.getMusicFolders();
   }
 
   @override
@@ -51,7 +52,7 @@ class _ViewSelectorState extends State<ViewSelector> {
                 onRefresh: () {
                   setState(() {
                     _views.clear();
-                    viewListFuture = _jellyfinApiHelper.getViews();
+                    viewListFuture = _subsonicApiHelper.getMusicFolders();
                   });
                 },
               );
@@ -118,16 +119,14 @@ class _ViewSelectorState extends State<ViewSelector> {
                     leading: Icon(Icons.refresh),
                     title: Text(AppLocalizations.of(context)!.refresh),
                     onTap: () => setState(() {
-                      viewListFuture = _jellyfinApiHelper.getViews();
+                      viewListFuture = _subsonicApiHelper.getMusicFolders();
                     }),
                   ),
                   ListTile(
                     leading: Icon(Icons.logout),
                     title: Text(AppLocalizations.of(context)!.logOut),
                     onTap: () async {
-                      final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-
-                      await jellyfinApiHelper.logoutCurrentUser().onError((_, __) {});
+                      await GetIt.instance<SubsonicUserHelper>().clearSessionAndSave().onError((_, _) {});
 
                       if (!context.mounted) return;
 

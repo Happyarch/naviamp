@@ -48,6 +48,22 @@ class SubsonicApiHelper {
     }
   }
 
+  // ── Music folders (libraries) ─────────────────────────────────────────────
+
+  Future<List<BaseItemDto>> getMusicFolders() async {
+    final inner = _unwrap(await _api.getMusicFolders());
+    final data = SubsonicMusicFolders.fromJson(inner['musicFolders'] as Map<String, dynamic>);
+    return [
+      for (final folder in data.musicFolder ?? <SubsonicMusicFolder>[])
+        BaseItemDto(
+          id: BaseItemId(folder.id.toString()),
+          name: folder.name,
+          collectionType: 'music',
+          type: 'CollectionFolder',
+        ),
+    ];
+  }
+
   // ── Artists ───────────────────────────────────────────────────────────────
 
   Future<List<BaseItemDto>> getArtists({int? musicFolderId}) async {
@@ -80,6 +96,17 @@ class SubsonicApiHelper {
       _albumToDto(album),
       (album.song ?? <SubsonicChild>[]).map(_childToDto).toList(),
     );
+  }
+
+  /// Returns just the album [BaseItemDto] for a given album ID.
+  Future<BaseItemDto?> getAlbumDto(BaseItemId id) async {
+    try {
+      final (album, _) = await getAlbum(id.raw);
+      return album;
+    } catch (e) {
+      _log.warning('getAlbumDto failed for ${id.raw}: $e');
+      return null;
+    }
   }
 
   Future<List<BaseItemDto>> getAlbumList2({
@@ -272,6 +299,28 @@ class SubsonicApiHelper {
     return SubsonicLyricsList.fromJson(inner['lyricsList'] as Map<String, dynamic>);
   }
 
+  /// Fetches lyrics for [id] and converts them to a [LyricDto] compatible with
+  /// the Finamp player. Prefers synced lyrics; falls back to unsynced. Returns
+  /// null if the server has no lyrics for this song.
+  Future<LyricDto?> getLyricsAsDto(String id) async {
+    final list = await getLyricsBySongId(id);
+    if (list == null || (list.structuredLyrics?.isEmpty ?? true)) return null;
+
+    // Prefer synced; fall back to unsynced.
+    final best = list.structuredLyrics!.firstWhere(
+      (l) => l.synced,
+      orElse: () => list.structuredLyrics!.first,
+    );
+
+    final offsetMs = best.offset?.round() ?? 0;
+    return LyricDto(
+      lyrics: best.line.map((l) {
+        final startTicks = l.start != null ? (l.start! + offsetMs) * 10000 : null;
+        return LyricLine(text: l.value, start: startTicks);
+      }).toList(),
+    );
+  }
+
   // ── URL builders ──────────────────────────────────────────────────────────
 
   /// Cover art URL. Uses the coverArt ID stored in `imageTags['Primary']`.
@@ -341,43 +390,89 @@ class SubsonicApiHelper {
 
   // ── DTO mappers ───────────────────────────────────────────────────────────
 
-  static BaseItemDto _childToDto(SubsonicChild child) => BaseItemDto(
-        id: BaseItemId(child.id),
-        name: child.title,
-        sortName: child.sortName,
-        type: 'Audio',
-        album: child.album,
-        albumId: child.albumId != null ? BaseItemId(child.albumId!) : null,
-        albumArtist: child.displayAlbumArtist ?? child.artist,
-        albumArtists: child.albumArtists
-            ?.map((a) => NameIdPair(name: a.name, id: BaseItemId(a.id)))
-            .toList(),
-        artists: child.displayArtist != null
-            ? [child.displayArtist!]
-            : child.artist != null
-                ? [child.artist!]
-                : null,
-        artistItems: child.artists
-            ?.map((a) => NameIdPair(name: a.name, id: BaseItemId(a.id)))
-            .toList(),
-        indexNumber: child.track,
-        parentIndexNumber: child.discNumber,
-        productionYear: child.year,
-        genres: child.genres?.map((g) => g.name).toList() ??
-            (child.genre != null ? [child.genre!] : null),
-        runTimeTicks:
-            child.duration != null ? child.duration! * _secondsToTicks : null,
-        imageTags: child.coverArt != null ? {'Primary': child.coverArt!} : null,
-        normalizationGain: child.replayGain?.baseGain ?? child.replayGain?.trackGain,
-        communityRating: child.averageRating,
-        userData: UserItemDataDto(
-          isFavorite: child.starred != null,
-          played: child.played != null,
-          playCount: child.playCount ?? 0,
-          playbackPositionTicks: 0,
+  static BaseItemDto _childToDto(SubsonicChild child) {
+    final runTimeTicks =
+        child.duration != null ? child.duration! * _secondsToTicks : null;
+    return BaseItemDto(
+      id: BaseItemId(child.id),
+      name: child.title,
+      sortName: child.sortName,
+      type: 'Audio',
+      album: child.album,
+      albumId: child.albumId != null ? BaseItemId(child.albumId!) : null,
+      albumArtist: child.displayAlbumArtist ?? child.artist,
+      albumArtists: child.albumArtists
+          ?.map((a) => NameIdPair(name: a.name, id: BaseItemId(a.id)))
+          .toList(),
+      artists: child.displayArtist != null
+          ? [child.displayArtist!]
+          : child.artist != null
+              ? [child.artist!]
+              : null,
+      artistItems: child.artists
+          ?.map((a) => NameIdPair(name: a.name, id: BaseItemId(a.id)))
+          .toList(),
+      indexNumber: child.track,
+      parentIndexNumber: child.discNumber,
+      productionYear: child.year,
+      genres: child.genres?.map((g) => g.name).toList() ??
+          (child.genre != null ? [child.genre!] : null),
+      runTimeTicks: runTimeTicks,
+      imageTags: child.coverArt != null ? {'Primary': child.coverArt!} : null,
+      normalizationGain:
+          child.replayGain?.baseGain ?? child.replayGain?.trackGain,
+      communityRating: child.averageRating,
+      userData: UserItemDataDto(
+        isFavorite: child.starred != null,
+        played: child.played != null,
+        playCount: child.playCount ?? 0,
+        playbackPositionTicks: 0,
+      ),
+      container: child.suffix,
+      mediaSources: [
+        MediaSourceInfo(
+          id: BaseItemId(child.id),
+          protocol: 'Http',
+          type: 'Default',
+          isRemote: true,
+          supportsTranscoding: true,
+          supportsDirectStream: true,
+          supportsDirectPlay: false,
+          isInfiniteStream: false,
+          requiresOpening: false,
+          requiresClosing: false,
+          requiresLooping: false,
+          supportsProbing: false,
+          readAtNativeFramerate: false,
+          ignoreDts: false,
+          ignoreIndex: false,
+          genPtsInput: false,
+          container: child.suffix,
+          name: child.title,
+          size: child.size,
+          bitrate: child.bitRate != null ? child.bitRate! * 1000 : null,
+          runTimeTicks: runTimeTicks,
+          mediaStreams: [
+            MediaStream(
+              index: 0,
+              type: 'Audio',
+              codec: child.suffix,
+              bitRate: child.bitRate != null ? child.bitRate! * 1000 : null,
+              sampleRate: child.samplingRate,
+              channels: child.channelCount,
+              bitDepth: child.bitDepth,
+              isInterlaced: false,
+              isDefault: true,
+              isForced: false,
+              isExternal: false,
+              isTextSubtitleStream: false,
+              supportsExternalStream: false,
+            ),
+          ],
         ),
-        container: child.suffix,
-      );
+      ],
+    );
+  }
 
   static BaseItemDto _artistToDto(SubsonicArtistID3 artist) => BaseItemDto(
         id: BaseItemId(artist.id),

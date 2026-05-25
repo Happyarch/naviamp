@@ -14,12 +14,12 @@ import 'package:window_manager/window_manager.dart';
 import '../models/finamp_models.dart';
 import '../models/jellyfin_models.dart' as jellyfin_models;
 import 'finamp_settings_helper.dart';
-import 'jellyfin_api_helper.dart';
 import 'offline_listen_helper.dart';
+import 'subsonic_api_helper.dart';
 
 /// A track queueing service for Finamp.
 class PlaybackHistoryService {
-  final _jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
+  final _subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
   final _audioService = GetIt.instance<MusicPlayerBackgroundTask>();
   final _queueService = GetIt.instance<QueueService>();
   final _offlineListenLogHelper = GetIt.instance<OfflineListenLogHelper>();
@@ -34,8 +34,6 @@ class PlaybackHistoryService {
   PlaybackState? _previousPlaybackState;
   DateTime _lastPositionUpdate = DateTime.now();
 
-  FinampQueueItem?
-  _lastReportedTrackStarted; // used to check if playback has already reported as "started" at some point for the current track
   FinampQueueItem? _lastReportedTrackStopped; // used to prevent reporting a track as stopped multiple times
 
   final _historyStream = BehaviorSubject<List<FinampHistoryItem>>.seeded(List.empty(growable: true));
@@ -359,11 +357,9 @@ class PlaybackHistoryService {
       _playbackHistoryServiceLogger.info("Stopping playback progress for ${previousItem?.item.title}");
       final playbackStopTime = DateTime.now();
       try {
-        _resetPeriodicUpdates(); // delay next periodic update to avoid race conditions with old data
-        //!!! allow reporting the same track here to skipping after looping a single track is reported correctly
+        _resetPeriodicUpdates();
         _lastReportedTrackStopped = previousItem;
-        await _jellyfinApiHelper.stopPlaybackProgress(previousTrackPlaybackData);
-        //TODO also mark the track as played in the user data: https://api.jellyfin.org/openapi/api.html#tag/Playstate/operation/MarkPlayedItem
+        await _subsonicApiHelper.scrobble(id: previousItem!.baseItem.id.raw, submission: true);
       } catch (e) {
         _playbackHistoryServiceLogger.warning(e);
         if (previousItem != null) {
@@ -374,13 +370,10 @@ class PlaybackHistoryService {
     if (newTrackplaybackData != null) {
       _playbackHistoryServiceLogger.info("Starting playback progress for ${currentItem.item.title}");
       try {
-        _resetPeriodicUpdates(); // delay next periodic update to avoid race conditions with old data
-        //!!! allow reporting the same track here to ensure loop one reports correctly
-        _lastReportedTrackStarted = _currentTrack?.item;
-        await _jellyfinApiHelper.reportPlaybackStart(newTrackplaybackData);
+        _resetPeriodicUpdates();
+        await _subsonicApiHelper.scrobble(id: currentItem.baseItem.id.raw, submission: false);
       } catch (e) {
         _playbackHistoryServiceLogger.warning(e);
-        // don't log start event to offline listen log helper, as only stop events are logged
       }
     }
     await DiscordRpc.updateRPC();
@@ -406,10 +399,10 @@ class PlaybackHistoryService {
         _playbackHistoryServiceLogger.info("Stopping playback progress for ${currentItem.item.title}");
         final playbackStopTime = DateTime.now();
         try {
-          _resetPeriodicUpdates(); // delay next periodic update to avoid race conditions with old data
+          _resetPeriodicUpdates();
           if (_lastReportedTrackStopped?.id != currentItem.id) {
             _lastReportedTrackStopped = currentItem;
-            await _jellyfinApiHelper.stopPlaybackProgress(playbackData);
+            await _subsonicApiHelper.scrobble(id: currentItem.baseItem.id.raw, submission: true);
           }
         } catch (e) {
           _playbackHistoryServiceLogger.warning(e);
@@ -448,7 +441,7 @@ class PlaybackHistoryService {
           if (FinampSettingsHelper.finampSettings.isOffline) {
             await _offlineListenLogHelper.logOfflineListen(_currentTrack!.item.item);
           } else {
-            await _jellyfinApiHelper.stopPlaybackProgress(playbackInfo);
+            await _subsonicApiHelper.scrobble(id: _currentTrack!.item.baseItem.id.raw, submission: true);
           }
         }
       } catch (e) {
@@ -463,17 +456,11 @@ class PlaybackHistoryService {
     if (FinampSettingsHelper.finampSettings.isOffline) {
       return;
     }
-    final playbackInfo = playbackData ?? generateGenericPlaybackProgressInfo();
-    if (playbackInfo != null) {
+    final songId = _currentTrack?.item.baseItem.id.raw;
+    if (songId != null) {
       try {
-        _resetPeriodicUpdates(); // delay next periodic update to avoid race conditions with old data
-        if (_lastReportedTrackStarted?.id != _currentTrack?.item.id) {
-          // _playbackStartNotYetReported = false;
-          _lastReportedTrackStarted = _currentTrack?.item;
-          await _jellyfinApiHelper.reportPlaybackStart(playbackInfo);
-        } else {
-          await _jellyfinApiHelper.updatePlaybackProgress(playbackInfo);
-        }
+        _resetPeriodicUpdates();
+        await _subsonicApiHelper.scrobble(id: songId, submission: false);
       } catch (e) {
         _playbackHistoryServiceLogger.warning(e);
       }
@@ -482,17 +469,7 @@ class PlaybackHistoryService {
   }
 
   Future<void> _updateQueueInfo() async {
-    if (FinampSettingsHelper.finampSettings.isOffline) {
-      return;
-    }
-    final playbackInfo = generateGenericPlaybackProgressInfo(includeNowPlayingQueue: true, force: true);
-    if (playbackInfo != null) {
-      try {
-        await _jellyfinApiHelper.updatePlaybackProgress(playbackInfo);
-      } catch (e) {
-        _playbackHistoryServiceLogger.warning(e);
-      }
-    }
+    // Subsonic has no queue-reporting API; this is a no-op.
   }
 
   Future<void> _reportPeriodicSessionStatus() async {

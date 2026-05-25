@@ -232,14 +232,15 @@ Functionally equivalent: `getPlaylists`, `getPlaylist(id)`, `createPlaylist`, `u
 - [x] `LoginServerSelectionPage` now shows `NavidromeServerWidget` on successful probe
 - [x] `LoginAuthenticationPage` authenticates via Subsonic ping; no Jellyfin updateCapabilities
 
-### Phase 5 — Wiring & Cleanup (Next)
+### Phase 5 — Wiring & Cleanup ✅ Mostly Complete
 Wire the new Subsonic services into the live app so playback and browsing actually work:
-- [ ] `metadata_provider.dart` — synthesize `PlaybackInfoResponse` / `MediaSourceInfo` from `SubsonicChild` fields
-- [ ] `music_player_background_task.dart` — swap stream URL construction
+- [x] **Password security** — `flutter_secure_storage` replaces plaintext `subsonicPassword`; Android Keystore on Android, libsecret/Secret Service on Linux; migration from old plaintext storage on first run
+- [x] `album_image_provider.dart` — routed cover art through `SubsonicApiHelper.getCoverArtUrl()`
+- [x] `view_selector.dart` — replaced `getViews()` with `SubsonicApiHelper.getMusicFolders()`; logout now calls `SubsonicUserHelper.clearSessionAndSave()`
+- [x] `metadata_provider.dart` — synthesizes `PlaybackInfoResponse`/`MediaSourceInfo` from `SubsonicChild` fields stored in `BaseItemDto.mediaSources` by `_childToDto`; fetches lyrics via `getLyricsAsDto()` → `LyricDto`; no server round-trip for basic playback metadata
+- [x] `playback_history_service.dart` — replaced Jellyfin session endpoints with `SubsonicApiHelper.scrobble()`; `submission: false` for now-playing, `submission: true` for track completion
+- [ ] `music_player_background_task.dart` — swap stream URL construction (Jellyfin `getAudioStreamUrl` → `SubsonicApiHelper.getStreamUrl()`)
 - [ ] `downloads_service.dart` — swap download URL construction
-- [ ] `playback_history_service.dart` — replace session endpoints with `scrobble()`
-- [ ] `image provider` — route cover art through `SubsonicApiHelper.getCoverArtUrl()`
-- [ ] `view_selector.dart` / library browsing screens — call `SubsonicApiHelper.getAlbumList2()` etc. instead of Jellyfin
 
 ### Phase 6 — Branding
 - [ ] App name: `finamp` → `naviamp` in `pubspec.yaml`
@@ -259,6 +260,6 @@ To pull UI improvements from upstream Finamp:
 
 ## Known Limitations / TODOs
 
-- **Password storage security**: `FinampUser.subsonicPassword` stores the password in plaintext in the Isar database. Jellyfin only stores an opaque access token. A future improvement could use the platform keychain (via `flutter_secure_storage`) instead.
-- **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. They will be removed in Phase 5 once Subsonic equivalents are wired up end-to-end.
+- **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. They will be removed once Subsonic equivalents are wired up end-to-end (Phase 5 remaining: stream URL in `music_player_background_task.dart`, download URL in `downloads_service.dart`).
 - **`FinampUser` Jellyfin fields** (`accessToken`, `serverId`, `views`) are still in the model. For Subsonic logins they are set to empty strings / empty maps. They will be cleaned up in Phase 5/6.
+- **`FinampUser.subsonicPassword`** field still exists in the model for migration reading (detects and migrates plaintext passwords from old installs to secure storage on first run). It is no longer written by new code. Can be removed in Phase 6 after migration window.

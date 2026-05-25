@@ -19,7 +19,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/jellyfin_models.dart';
 import 'downloads_service.dart';
 import 'finamp_settings_helper.dart';
-import 'jellyfin_api_helper.dart';
+import 'subsonic_api_helper.dart';
 
 final albumImageProviderLogger = Logger("AlbumImageProvider");
 
@@ -98,7 +98,7 @@ albumImageProvider = Provider.autoDispose.family<AlbumImageInfo, AlbumImageReque
     return AlbumImageInfo.empty(request);
   }
 
-  final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
+  final subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
   final isardownloader = GetIt.instance<DownloadsService>();
 
   File? downloadedImage = isardownloader.getImageDownload(item: request.item)?.file;
@@ -130,13 +130,9 @@ albumImageProvider = Provider.autoDispose.family<AlbumImageInfo, AlbumImageReque
     Uri? imageUrl;
 
     if (request.fullQuality) {
-      imageUrl = jellyfinApiHelper.getImageUrl(item: request.item, quality: null, format: null);
+      imageUrl = subsonicApiHelper.getCoverArtUrl(request.item);
     } else {
-      imageUrl = jellyfinApiHelper.getImageUrl(
-        item: request.item,
-        maxWidth: request.maxWidth,
-        maxHeight: request.maxHeight,
-      );
+      imageUrl = subsonicApiHelper.getCoverArtUrl(request.item, size: request.maxWidth);
     }
 
     if (imageUrl == null) {

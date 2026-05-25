@@ -3,13 +3,11 @@ import 'package:logging/logging.dart';
 
 import '../models/finamp_models.dart';
 import 'finamp_user_helper.dart';
+import 'secure_credential_storage.dart';
 
 final _log = Logger('SubsonicUserHelper');
 
 /// Holds credentials for the active Subsonic/Navidrome session.
-///
-/// Phase 2: in-memory only. Phase 4 will back this with Isar persistence
-/// and wire it into FinampUser so credentials survive app restarts.
 class SubsonicCredentials {
   final String username;
   final String password; // stored to re-generate token+salt per request
@@ -28,15 +26,14 @@ class SubsonicUserHelper {
   String? get serverUrl => _serverUrl;
   SubsonicCredentials? get credentials => _credentials;
 
-  bool get hasCredentials =>
-      _serverUrl != null && _credentials != null;
+  bool get hasCredentials => _serverUrl != null && _credentials != null;
 
   void setSession({
     required String serverUrl,
     required String username,
     required String password,
   }) {
-    _serverUrl = serverUrl.trimRight().replaceAll(RegExp(r'/+$'), ''); // strip trailing slashes
+    _serverUrl = serverUrl.trimRight().replaceAll(RegExp(r'/+$'), '');
     _credentials = SubsonicCredentials(username: username, password: password);
     serverUrlOverride = null;
     _log.info('Subsonic session set for $username @ $_serverUrl');
@@ -49,27 +46,52 @@ class SubsonicUserHelper {
     _log.info('Subsonic session cleared');
   }
 
-  /// Restores a saved session from the [FinampUser] stored in Isar, if one
-  /// exists and has Subsonic credentials.
-  void loadIfSaved() {
-    final user = GetIt.instance<FinampUserHelper>().currentUser;
-    if (user?.subsonicPassword != null) {
+  /// Clears the in-memory session and removes the saved password from secure
+  /// storage. Call this on logout.
+  Future<void> clearSessionAndSave() async {
+    clearSession();
+    await SecureCredentialStorage.clearPassword();
+  }
+
+  /// Restores a saved session from secure storage on app startup.
+  ///
+  /// Also handles a one-time migration: if the password was previously stored
+  /// in plaintext inside [FinampUser.subsonicPassword], it is moved to secure
+  /// storage and cleared from the Isar record.
+  Future<void> loadIfSaved() async {
+    final userHelper = GetIt.instance<FinampUserHelper>();
+    final user = userHelper.currentUser;
+    if (user == null) return;
+
+    String? password = await SecureCredentialStorage.loadPassword();
+
+    // One-time migration: move plaintext password out of Isar.
+    if (password == null && user.subsonicPassword != null) {
+      _log.info('Migrating plaintext password to secure storage');
+      password = user.subsonicPassword;
+      await SecureCredentialStorage.savePassword(password!);
+      user.subsonicPassword = null;
+      await userHelper.saveUser(user);
+    }
+
+    if (password != null) {
       setSession(
-        serverUrl: user!.publicAddress,
+        serverUrl: user.publicAddress,
         username: user.id,
-        password: user.subsonicPassword!,
+        password: password,
       );
     }
   }
 
-  /// Sets the in-memory session and persists the credentials to Isar so they
-  /// survive app restarts.
+  /// Sets the in-memory session, saves the password to secure storage, and
+  /// persists the server URL and username to Isar (without the password).
   Future<void> setSessionAndSave({
     required String serverUrl,
     required String username,
     required String password,
   }) async {
     setSession(serverUrl: serverUrl, username: username, password: password);
+    await SecureCredentialStorage.savePassword(password);
     final user = FinampUser(
       id: username,
       publicAddress: serverUrl,
@@ -78,7 +100,7 @@ class SubsonicUserHelper {
       preferLocalNetwork: false,
       accessToken: '',
       serverId: '',
-      subsonicPassword: password,
+      // subsonicPassword intentionally omitted — stored in secure storage
     );
     await GetIt.instance<FinampUserHelper>().saveUser(user);
   }

@@ -7,7 +7,7 @@ import 'package:logging/logging.dart';
 import '../models/jellyfin_models.dart';
 import 'downloads_service.dart';
 import 'finamp_settings_helper.dart';
-import 'jellyfin_api_helper.dart';
+import 'subsonic_api_helper.dart';
 
 final metadataProviderLogger = Logger("MetadataProvider");
 
@@ -40,6 +40,43 @@ class MetadataProvider {
   bool get hasLyrics => mediaSourceInfo.mediaStreams.any((e) => e.type == "Lyric");
 }
 
+/// Synthesises a [PlaybackInfoResponse] from the song's own [BaseItemDto].
+/// The DTO is populated by [SubsonicApiHelper._childToDto] with audio codec
+/// metadata from the Subsonic response.
+PlaybackInfoResponse _buildPlaybackInfo(BaseItemDto item) {
+  final source = item.mediaSources?.firstOrNull;
+  if (source != null) {
+    return PlaybackInfoResponse(mediaSources: [source]);
+  }
+  // Fallback for items without mediaSources (should not happen for songs).
+  return PlaybackInfoResponse(
+    mediaSources: [
+      MediaSourceInfo(
+        id: item.id,
+        protocol: 'Http',
+        type: 'Default',
+        isRemote: true,
+        supportsTranscoding: true,
+        supportsDirectStream: true,
+        supportsDirectPlay: false,
+        isInfiniteStream: false,
+        requiresOpening: false,
+        requiresClosing: false,
+        requiresLooping: false,
+        supportsProbing: false,
+        readAtNativeFramerate: false,
+        ignoreDts: false,
+        ignoreIndex: false,
+        genPtsInput: false,
+        container: item.container,
+        name: item.name,
+        runTimeTicks: item.runTimeTicks,
+        mediaStreams: const [],
+      ),
+    ],
+  );
+}
+
 final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataProvider = FutureProvider.autoDispose
     .family<MetadataProvider?, BaseItemDto>((ref, item) async {
       Future<BaseItemDto?>? parentFuture;
@@ -47,7 +84,7 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
         parentFuture = ref.watch(albumProvider(item.parentId!).future);
       }
 
-      final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
+      final subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
       final downloadsService = GetIt.instance<DownloadsService>();
 
       metadataProviderLogger.fine("Fetching metadata for '${item.name}' (${item.id})");
@@ -64,8 +101,6 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
           var audioStream =
               downloadItem.baseItem!.mediaStreams?.firstWhereOrNull((s) => s.type == "Audio") ??
               downloadItem.baseItem!.mediaStreams?.firstOrNull;
-          // We could explicitly get a mediaSource of type Default, but just grabbing
-          // the first seems to generally work?
           var codec = profile?.codec != FinampTranscodingCodec.original ? profile?.codec.name : audioStream?.codec;
           var container = profile?.codec != FinampTranscodingCodec.original
               ? profile?.codec.container
@@ -74,9 +109,6 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
               ? profile?.stereoBitrate
               : downloadItem.baseItem!.mediaSources?.firstOrNull?.bitrate;
 
-          // We cannot create accurate MediaStreams for a transcoded item,so
-          // just return the lyrics stream, as those are not affected and will not
-          // be shown if the mediaStream is not present
           List<MediaStream> mediaStream = profile?.codec != FinampTranscodingCodec.original
               ? [
                       MediaStream(
@@ -86,8 +118,6 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
                         bitRate: bitrate,
                         sampleRate: null,
                         channels: null,
-                        // Lossy formats do not have a fixed bit depth
-                        //bitDepth: audioStream?.bitDepth,
                         bitDepth: null,
                         isInterlaced: false,
                         isDefault: true,
@@ -131,31 +161,19 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
         }
       }
 
-      //!!! only use offline metadata if the app is in offline mode
-      // Finamp should always use the server metadata when online, if possible
       if (ref.watch(finampSettingsProvider.isOffline)) {
         playbackInfo = localPlaybackInfo;
       } else {
-        // fetch from server in online mode
-        metadataProviderLogger.fine(
-          "Fetching metadata for '${item.name}' (${item.id}) from server due to missing attributes",
-        );
-        try {
-          playbackInfo = await jellyfinApiHelper.getPlaybackInfo(item.id);
-        } catch (e) {
-          metadataProviderLogger.severe("Failed to fetch metadata for '${item.name}' (${item.id})", e);
-          return null;
-        }
+        // Build playback info from the song's own DTO (populated by _childToDto).
+        playbackInfo = _buildPlaybackInfo(item);
 
-        // update **PARTS** of playbackInfo with localPlaybackInfo if available
+        // Merge downloaded file metadata when available.
         if (localPlaybackInfo != null && (playbackInfo.mediaSources?.isNotEmpty ?? false)) {
           playbackInfo.mediaSources!.first.protocol = localPlaybackInfo.mediaSources!.first.protocol;
           playbackInfo.mediaSources!.first.bitrate = localPlaybackInfo.mediaSources!.first.bitrate;
           var remoteBitDepth = playbackInfo.mediaSources!.first.mediaStreams
               .firstWhereOrNull((x) => x.type == "Audio")
               ?.bitDepth;
-          // Use lyrics mediastream from online item, but take all other streams
-          // from downloaded item
           playbackInfo.mediaSources!.first.mediaStreams = playbackInfo.mediaSources!.first.mediaStreams
               .where((x) => x.type == "Lyric")
               .toList();
@@ -163,7 +181,6 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
             localPlaybackInfo.mediaSources!.first.mediaStreams.where((x) => x.type != "Lyric"),
           );
           var audioStream = playbackInfo.mediaSources!.first.mediaStreams.firstWhereOrNull((x) => x.type == "Audio");
-          // we don't specify a bit depth when downloading, so the remote bit depth should be accurate
           if (audioStream != null) {
             audioStream.bitDepth = remoteBitDepth;
           }
@@ -198,40 +215,33 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
       if (!metadata.qualifiesForPlaybackSpeedControl &&
           (metadata.mediaSourceInfo.runTimeTicks ?? 0) >
               MetadataProvider.speedControlLongTrackDuration.inMicroseconds * 10) {
-        // we might want playback speed control for long tracks (like podcasts or audiobook chapters)
         metadata.qualifiesForPlaybackSpeedControl = true;
       }
 
-      // check if item qualifies for having playback speed control available
       if (!metadata.qualifiesForPlaybackSpeedControl &&
           parent != null &&
           (parent.runTimeTicks ?? 0) > MetadataProvider.speedControlLongAlbumDuration.inMicroseconds * 10) {
         metadata.qualifiesForPlaybackSpeedControl = true;
       }
 
-      if (metadata.hasLyrics) {
-        //!!! only use offline metadata if the app is in offline mode
-        // Finamp should always use the server metadata when online, if possible
-        if (ref.watch(finampSettingsProvider.isOffline)) {
-          DownloadedLyrics? downloadedLyrics;
-          downloadedLyrics = await downloadsService.getLyricsDownload(baseItem: item);
-          if (downloadedLyrics != null) {
-            metadata.lyrics = downloadedLyrics.lyricDto;
-            metadataProviderLogger.fine("Got offline lyrics for '${item.name}'");
-          } else {
-            metadataProviderLogger.fine("No offline lyrics for '${item.name}'");
-          }
+      // Lyrics: try fetching from server when online, offline download when offline.
+      if (ref.watch(finampSettingsProvider.isOffline)) {
+        final downloadedLyrics = await downloadsService.getLyricsDownload(baseItem: item);
+        if (downloadedLyrics != null) {
+          metadata.lyrics = downloadedLyrics.lyricDto;
+          metadataProviderLogger.fine("Got offline lyrics for '${item.name}'");
         } else {
-          metadataProviderLogger.fine("Fetching lyrics for '${item.name}' (${item.id})");
-          try {
-            final lyrics = await jellyfinApiHelper.getLyrics(itemId: item.id);
-            metadata.lyrics = lyrics;
-          } catch (e) {
-            metadataProviderLogger.warning(
-              "Failed to fetch lyrics for '${item.name}' (${item.id}). Metadata might be stale",
-              e,
-            );
-          }
+          metadataProviderLogger.fine("No offline lyrics for '${item.name}'");
+        }
+      } else {
+        metadataProviderLogger.fine("Fetching lyrics for '${item.name}' (${item.id})");
+        try {
+          metadata.lyrics = await subsonicApiHelper.getLyricsAsDto(item.id.raw);
+        } catch (e) {
+          metadataProviderLogger.warning(
+            "Failed to fetch lyrics for '${item.name}' (${item.id}). Metadata might be stale",
+            e,
+          );
         }
       }
 
@@ -244,7 +254,7 @@ final AutoDisposeFutureProviderFamily<MetadataProvider?, BaseItemDto> metadataPr
 
 final AutoDisposeFutureProviderFamily<BaseItemDto?, BaseItemId> albumProvider = FutureProvider.autoDispose
     .family<BaseItemDto?, BaseItemId>((ref, parentId) async {
-      final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
+      final subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
       final downloadsService = GetIt.instance<DownloadsService>();
 
       if (ref.watch(finampSettingsProvider.isOffline)) {
@@ -257,11 +267,7 @@ final AutoDisposeFutureProviderFamily<BaseItemDto?, BaseItemId> albumProvider = 
           return parentInfo.baseItem;
         }
       } else {
-        try {
-          return await jellyfinApiHelper.getItemById(parentId);
-        } catch (e) {
-          metadataProviderLogger.warning("Failed to get parent item '$parentId'", e);
-        }
+        return await subsonicApiHelper.getAlbumDto(parentId);
       }
       return null;
     });

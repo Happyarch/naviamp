@@ -155,6 +155,7 @@ dependencies:
   dbus: ^0.7.11
   bits: ^1.4.0
   diacritic: ^0.1.6
+  flutter_secure_storage: ^9.2.4
 
 dev_dependencies:
   flutter_test:

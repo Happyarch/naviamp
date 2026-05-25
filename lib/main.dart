@@ -557,7 +557,7 @@ Future<void> _setupFinampUserHelper() async {
   final subsonicUserHelper = SubsonicUserHelper();
   GetIt.instance.registerSingleton(subsonicUserHelper);
   GetIt.instance.registerSingleton(SubsonicApiHelper());
-  subsonicUserHelper.loadIfSaved();
+  await subsonicUserHelper.loadIfSaved();
 }
 
 class Finamp extends StatefulWidget {
