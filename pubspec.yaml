@@ -29,6 +29,7 @@ dependencies:
   background_downloader: ^9.2.3
   json_annotation: ^4.8.1
   chopper: ^8.0.0
+  crypto: ^3.0.3
   get_it: ^8.2.0
   # just_audio: ^0.10.5
   just_audio:
