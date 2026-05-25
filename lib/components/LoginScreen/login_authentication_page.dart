@@ -1,11 +1,11 @@
 import 'package:finamp/components/Buttons/cta_medium.dart';
 import 'package:finamp/components/Buttons/simple_button.dart';
 import 'package:finamp/components/finamp_icon.dart';
-import 'package:finamp/components/LoginScreen/login_user_selection_page.dart';
 import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
-import 'package:finamp/models/jellyfin_models.dart';
-import 'package:finamp/services/jellyfin_api_helper.dart';
+import 'package:finamp/models/subsonic_models.dart';
+import 'package:finamp/services/subsonic_api_helper.dart';
+import 'package:finamp/services/subsonic_user_helper.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
 import 'package:get_it/get_it.dart';
@@ -16,34 +16,31 @@ import 'login_flow.dart';
 class LoginAuthenticationPage extends StatefulWidget {
   static const routeName = "login/authentication";
 
+  final ServerState serverState;
   final ConnectionState? connectionState;
   final VoidCallback? onAuthenticated;
 
-  const LoginAuthenticationPage({super.key, required this.connectionState, required this.onAuthenticated});
+  const LoginAuthenticationPage({
+    super.key,
+    required this.serverState,
+    required this.connectionState,
+    required this.onAuthenticated,
+  });
 
   @override
   State<LoginAuthenticationPage> createState() => _LoginAuthenticationPageState();
 }
 
 class _LoginAuthenticationPageState extends State<LoginAuthenticationPage> {
-  static final _loginAuthenticationPageLogger = Logger("LoginAuthenticationPage");
+  static final _log = Logger("LoginAuthenticationPage");
 
-  final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
+  final _subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
+  final _subsonicUserHelper = GetIt.instance<SubsonicUserHelper>();
 
   String? username;
   String? password;
-  String? authToken;
-  PublicSystemInfoResult? serverInfo;
 
   final formKey = GlobalKey<FormState>();
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.connectionState?.selectedUser != null) {
-      username = widget.connectionState?.selectedUser?.name;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,14 +62,11 @@ class _LoginAuthenticationPageState extends State<LoginAuthenticationPage> {
                   alignment: Alignment.centerLeft,
                   child: SimpleButton(
                     icon: TablerIcons.chevron_left,
-                    text: AppLocalizations.of(context)!.backToAccountSelection,
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
+                    text: AppLocalizations.of(context)!.back,
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
               ),
-              JellyfinUserWidget(user: widget.connectionState?.selectedUser),
               _buildLoginForm(context),
               const SizedBox(height: 16),
               CTAMedium(
@@ -88,8 +82,6 @@ class _LoginAuthenticationPageState extends State<LoginAuthenticationPage> {
   }
 
   Form _buildLoginForm(BuildContext context) {
-    // This variable is for handling shifting focus when the user presses submit.
-    // https://stackoverflow.com/questions/52150677/how-to-shift-focus-to-next-textfield-in-flutter
     final node = FocusScope.of(context);
 
     InputDecoration inputFieldDecoration(String placeholder) {
@@ -121,10 +113,9 @@ class _LoginAuthenticationPageState extends State<LoginAuthenticationPage> {
               decoration: inputFieldDecoration(AppLocalizations.of(context)!.usernameHint),
               textInputAction: TextInputAction.next,
               onEditingComplete: () => node.nextFocus(),
-              initialValue: username,
               onSaved: (newValue) => username = newValue,
               validator: (value) {
-                if (value?.isEmpty == true) {
+                if (value?.isEmpty ?? false) {
                   return AppLocalizations.of(context)!.usernameValidationMissingUsername;
                 }
                 return null;
@@ -150,37 +141,59 @@ class _LoginAuthenticationPageState extends State<LoginAuthenticationPage> {
     );
   }
 
-  /// Function to handle logging in for Widgets, including a snackbar for errors.
-  Future<void> loginHelper({required String username, String? password, required BuildContext context}) async {
-    JellyfinApiHelper jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-
-    try {
-      if (password == null) {
-        await jellyfinApiHelper.authenticateViaName(username: username);
-      } else {
-        await jellyfinApiHelper.authenticateViaName(username: username, password: password);
-      }
-
-      if (!mounted) return;
-      widget.onAuthenticated?.call();
-    } catch (e) {
-      GlobalSnackbar.error(e);
-
-      // We return here to stop the function from continuing.
-      return;
+  Future<void> sendForm() async {
+    if ((formKey.currentState?.validate() ?? false) && !(widget.connectionState?.isAuthenticating ?? false)) {
+      formKey.currentState!.save();
+      setState(() {
+        widget.connectionState?.isAuthenticating = true;
+      });
+      await _authenticate();
+      setState(() {
+        widget.connectionState?.isAuthenticating = false;
+      });
     }
   }
 
-  Future<void> sendForm() async {
-    if ((formKey.currentState?.validate() ?? false) && !widget.connectionState!.isAuthenticating) {
-      formKey.currentState!.save();
-      setState(() {
-        widget.connectionState!.isAuthenticating = true;
-      });
-      await loginHelper(username: username!, password: password, context: context);
-      setState(() {
-        widget.connectionState!.isAuthenticating = false;
-      });
+  Future<void> _authenticate() async {
+    final serverUrl = widget.serverState.baseUrl;
+    if (serverUrl == null) {
+      GlobalSnackbar.error("No server URL set. Please go back and select a server.");
+      return;
     }
+
+    // Set credentials on the helper so the interceptor can use them for ping.
+    _subsonicUserHelper.serverUrlOverride = serverUrl;
+    _subsonicUserHelper.setSession(
+      serverUrl: serverUrl,
+      username: username!,
+      password: password ?? '',
+    );
+
+    try {
+      await _subsonicApiHelper.ping();
+    } on SubsonicException catch (e) {
+      // Authentication failed — clear the in-memory session
+      _subsonicUserHelper.clearSession();
+      GlobalSnackbar.error(e.message);
+      return;
+    } catch (e) {
+      _subsonicUserHelper.clearSession();
+      GlobalSnackbar.error(e);
+      return;
+    }
+
+    // Ping succeeded — persist credentials to Isar
+    try {
+      await _subsonicUserHelper.setSessionAndSave(
+        serverUrl: serverUrl,
+        username: username!,
+        password: password ?? '',
+      );
+    } catch (e) {
+      _log.warning('Failed to persist Subsonic session: $e', e);
+    }
+
+    if (!mounted) return;
+    widget.onAuthenticated?.call();
   }
 }

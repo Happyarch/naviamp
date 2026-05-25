@@ -17,11 +17,35 @@ class SubsonicApiHelper {
   final _api = SubsonicApi.create();
   final _userHelper = GetIt.instance<SubsonicUserHelper>();
 
-  // ── Ping ──────────────────────────────────────────────────────────────────
+  // ── Ping / server probe ───────────────────────────────────────────────────
 
-  Future<void> ping() async {
+  /// Full authenticated ping. Returns server metadata; throws [SubsonicException]
+  /// on auth failure or server error.
+  Future<SubsonicServerInfo> ping() async {
     final inner = _unwrap(await _api.ping());
     _log.fine('ping ok: ${inner['version']}');
+    return SubsonicServerInfo.fromInner(inner);
+  }
+
+  /// Probes [url] to check if a Subsonic-compatible server is present.
+  /// Does NOT require credentials — error 10 (missing params) still means a
+  /// valid Subsonic server. Returns null if the URL is unreachable or not
+  /// a Subsonic server.
+  Future<SubsonicServerInfo?> probeServer(String url) async {
+    final normalised = url.trim().replaceAll(RegExp(r'/+$'), '');
+    _userHelper.serverUrlOverride = normalised;
+    try {
+      final response = await _api.ping() as Response;
+      _userHelper.serverUrlOverride = null;
+      if (!response.isSuccessful) return null;
+      final body = response.body as Map<String, dynamic>?;
+      if (body == null || !body.containsKey('subsonic-response')) return null;
+      final inner = body['subsonic-response'] as Map<String, dynamic>;
+      return SubsonicServerInfo.fromInner(inner);
+    } catch (_) {
+      _userHelper.serverUrlOverride = null;
+      return null;
+    }
   }
 
   // ── Artists ───────────────────────────────────────────────────────────────
@@ -266,7 +290,7 @@ class SubsonicApiHelper {
   Uri getStreamUrl(BaseItemDto item, {String? format, int? maxBitRate}) {
     return _buildAuthUri('/rest/stream.view', {
       'id': item.id.raw,
-      'format': ?format,
+      if (format != null) 'format': format,
       if (maxBitRate != null) 'maxBitRate': maxBitRate.toString(),
     });
   }

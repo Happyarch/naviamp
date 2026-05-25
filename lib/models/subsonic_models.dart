@@ -37,6 +37,7 @@ class SubsonicException implements Exception {
   SubsonicException({required this.code, required this.message});
 
   // Standard Subsonic error codes
+  bool get isRequiredParamMissing => code == 10;
   bool get isAuthError => code == 40 || code == 41;
   bool get isNotFound => code == 70;
   bool get isNotAuthorized => code == 50;

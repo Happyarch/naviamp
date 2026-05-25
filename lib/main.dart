@@ -44,6 +44,8 @@ import 'package:finamp/services/offline_listen_helper.dart';
 import 'package:finamp/services/playback_history_service.dart';
 import 'package:finamp/services/playon_service.dart';
 import 'package:finamp/services/queue_service.dart';
+import 'package:finamp/services/subsonic_api_helper.dart';
+import 'package:finamp/services/subsonic_user_helper.dart';
 import 'package:finamp/services/theme_provider.dart';
 import 'package:finamp/services/ui_overlay_setter_observer.dart';
 import 'package:finamp/services/widget_bindings_observer_provider.dart';
@@ -551,6 +553,11 @@ Future<void> _setupFinampUserHelper() async {
     FinampSetters.setHasCompletedIsarUserMigration(true);
   }
   await GetIt.instance<FinampUserHelper>().setAuthHeader();
+
+  final subsonicUserHelper = SubsonicUserHelper();
+  GetIt.instance.registerSingleton(subsonicUserHelper);
+  GetIt.instance.registerSingleton(SubsonicApiHelper());
+  subsonicUserHelper.loadIfSaved();
 }
 
 class Finamp extends StatefulWidget {

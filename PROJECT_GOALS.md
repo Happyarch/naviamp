@@ -13,7 +13,7 @@ Naviamp is a fork of [Finamp](https://github.com/jmshrv/finamp) that replaces th
 | **UI / widgets** | Leave untouched except branding. Copy upstream changes freely. |
 | **Data models (UI-facing)** | Keep the same types the UI uses (`BaseItemDto`, etc.) so upstream UI PRs apply cleanly. |
 | **Service layer** | Full replacement — Jellyfin API → Navidrome/OpenSubsonic API. |
-| **App settings / downloads** | `finamp_models.dart` largely intact; strip Jellyfin-specific fields. |
+| **App settings / downloads** | `finamp_models.dart` largely intact; strip Jellyfin-specific fields over time. |
 
 ---
 
@@ -33,14 +33,19 @@ This sets `JAVA_HOME`, `ANDROID_HOME`, and PATH without permanently modifying yo
 
 3. **Android SDK** — install to `~/Android/Sdk` (see Android SDK Setup section below).
 
-4. **Get dependencies and generate code:**
+4. **Rust** — required by `flutter_discord_rpc`:
+   ```sh
+   sudo pacman -S rustup && rustup default stable
+   ```
+
+5. **Get dependencies and generate code:**
    ```sh
    source dev-env.sh
    ./flutterw pub get
    ./flutterw pub run build_runner build --delete-conflicting-outputs
    ```
 
-5. **Verify:**
+6. **Verify:**
    ```sh
    ./flutterw doctor
    ```
@@ -63,7 +68,8 @@ Install Google's commandline tools to `~/Android/Sdk`. The directory must look e
 ├── build-tools/             ← created by sdkmanager
 │   └── 36.0.0/
 └── platforms/               ← created by sdkmanager
-    └── android-35/
+    ├── android-35/
+    └── android-36/
 ```
 
 Steps:
@@ -79,24 +85,26 @@ mv /tmp/android-tools/cmdline-tools/* ~/Android/Sdk/cmdline-tools/latest/
 # Install SDK components
 source dev-env.sh
 sdkmanager --licenses
-sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-35"
+sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-35" "platforms;android-36"
 ```
 
 ---
 
 ## Codebase Overview
 
-| Layer | Files | Role |
+| Layer | Files | Status |
 |---|---|---|
-| API client | `lib/services/jellyfin_api.dart` + `.chopper.dart` | **REPLACE** — Chopper HTTP client for Jellyfin |
-| API helper | `lib/services/jellyfin_api_helper.dart` | **REPLACE** — high-level operations, URL building (~1230 lines) |
-| User/auth | `lib/services/finamp_user_helper.dart` | **MODIFY** — swap Jellyfin auth header for Subsonic token params |
-| Server models | `lib/models/jellyfin_models.dart` | **REPLACE** — Jellyfin-specific JSON models |
-| App models | `lib/models/finamp_models.dart` | **KEEP / TRIM** — settings, FinampUser, download models |
-| Metadata | `lib/services/metadata_provider.dart` | **MODIFY** — remove PlaybackInfoResponse dependency |
-| Playback | `lib/services/music_player_background_task.dart` | **MODIFY lightly** — stream URL construction |
-| Downloads | `lib/services/downloads_service.dart` + `_backend.dart` | **MODIFY** — swap download URL construction |
-| UI | `lib/components/`, `lib/screens/` | **LEAVE ALONE** except branding |
+| Subsonic models | `lib/models/subsonic_models.dart` + `.g.dart` | ✅ Done |
+| Subsonic API client | `lib/services/subsonic_api.dart` + `.chopper.dart` | ✅ Done |
+| Subsonic user/session | `lib/services/subsonic_user_helper.dart` | ✅ Done |
+| Subsonic API helper | `lib/services/subsonic_api_helper.dart` | ✅ Done |
+| Login flow | `lib/components/LoginScreen/` | ✅ Done (Phase 4) |
+| Jellyfin API client | `lib/services/jellyfin_api.dart` + `jellyfin_api_helper.dart` | To replace (Phase 5) |
+| User/auth model | `lib/models/finamp_models.dart` (`FinampUser`) | Partially done — `subsonicPassword` added |
+| Metadata provider | `lib/services/metadata_provider.dart` | Phase 5 |
+| Playback | `lib/services/music_player_background_task.dart` | Phase 5 |
+| Downloads | `lib/services/downloads_service.dart` | Phase 5 |
+| UI | `lib/components/`, `lib/screens/` | Leave alone |
 
 State management: **Riverpod**. DI: **get_it**. DB: **Isar**. HTTP: **Chopper**.
 
@@ -110,8 +118,8 @@ State management: **Riverpod**. DI: **get_it**. DB: **Isar**. HTTP: **Chopper**.
 |---|---|
 | `POST /Users/AuthenticateByName` | Query params on every request: `u`, `t=md5(password+salt)`, `s=salt` |
 | `MediaBrowser ...` auth header | No header — credentials in every request's query string |
-| Access token stored in `FinampUser.accessToken` | Salt stored; password hashed on the fly |
-| QuickConnect | **Not available** — remove from UI |
+| Access token stored in `FinampUser.accessToken` | Password stored in `FinampUser.subsonicPassword`; token computed per-request |
+| QuickConnect | **Not available** — removed from UI |
 
 ### Browse
 
@@ -149,15 +157,15 @@ State management: **Riverpod**. DI: **get_it**. DB: **Isar**. HTTP: **Chopper**.
 |---|---|
 | `/Items/{id}/Images/Primary` | `/rest/getCoverArt.view?id=...&size=...` |
 
-Works for songs, albums, and artists — same `id` field.
+Cover art IDs are stored in `BaseItemDto.imageTags['Primary']` for Subsonic items.
 
 ### Lyrics
 
 | Jellyfin | Navidrome |
 |---|---|
-| `GET /Audio/{itemId}/Lyrics` | `getLyrics?artist=...&title=...` |
+| `GET /Audio/{itemId}/Lyrics` | `getLyricsBySongId?id=...` (OpenSubsonic structured) |
 
-**Difference:** Navidrome looks up lyrics by artist name + track title, not item ID. Must pass those fields from the track metadata.
+Navidrome supports the OpenSubsonic `getLyricsBySongId` extension which returns synced/multi-language lyrics by song ID.
 
 ### Favorites
 
@@ -173,59 +181,71 @@ Functionally equivalent: `getPlaylists`, `getPlaylist(id)`, `createPlaylist`, `u
 
 ### Similar / Radio
 
-| Jellyfin | Navidrome |
-|---|---|
-| `GET /Items/{id}/InstantMix` | `getSimilarSongs2(id)` |
-| `GET /Albums/{id}/Similar` | `getSimilarSongs2` (song-level only) |
+| Jellyfin | Navidrome | Notes |
+|---|---|---|
+| `GET /Items/{id}/InstantMix` | `getInstantMix(id)` | OpenSubsonic "Sonic Similarity" extension |
+| `GET /Albums/{id}/Similar` | `getSimilarSongs2(id)` | Song-level only in Subsonic |
 
 ---
 
 ## Implementation Phases
 
-### Phase 0 — Dev Environment ✓
+### Phase 0 — Dev Environment ✅ Complete
 - [x] Initialize `.flutter` submodule — Flutter 3.44.0 / Dart 3.12.0 @ `heads/stable`
 - [x] Install Android SDK to `~/Android/Sdk` — build-tools 36.0.0, platforms android-35/36, NDK 28.2, CMake 3.22
+- [x] Install Rust via `rustup` (required by `flutter_discord_rpc`)
 - [x] `./flutterw doctor` — Android toolchain green
 - [x] `./flutterw pub get && ./flutterw pub run build_runner build`
 - [x] `./flutterw build apk --debug` succeeds
 
-### Phase 1 — Navidrome Models
-Create `lib/models/subsonic_models.dart` with JSON-serializable Dart classes for OpenSubsonic responses:
-- `SubsonicResponse<T>` wrapper
-- `ArtistID3`, `AlbumID3`, `Child` (song), `Genre`, `Playlist`, `PlaylistWithSongs`
-- `StarredResult`, `SearchResult3`, `LyricsList`
-- Auth helpers (token generation)
+### Phase 1 — Navidrome Models ✅ Complete
+`lib/models/subsonic_models.dart` + generated `.g.dart`
+- [x] `SubsonicEnvelope.unwrap()` — parses and validates the `subsonic-response` envelope
+- [x] `SubsonicException` — error codes including auth, not-found, missing-params
+- [x] `SubsonicChild` (song), `SubsonicArtistID3`, `SubsonicAlbumID3` — full OpenSubsonic fields
+- [x] `SubsonicPlaylist` / `SubsonicPlaylistWithSongs`, `SubsonicSearchResult3`, `SubsonicStarred2`
+- [x] `SubsonicStructuredLyrics` / `SubsonicLyricsList` — OpenSubsonic synced lyrics
+- [x] `SubsonicServerInfo` — server version/type from ping envelope
 
-These are **internal** — the service layer maps them to existing `BaseItemDto` types before the UI ever sees them.
+### Phase 2 — Subsonic API Client ✅ Complete
+`lib/services/subsonic_api.dart` + generated `.chopper.dart`, `subsonic_user_helper.dart`
+- [x] `SubsonicAuth.generateSalt()` / `generateToken()` — MD5 per-request auth
+- [x] `SubsonicApi` Chopper service — all OpenSubsonic endpoints (ping, browse, search, playlist, scrobble, lyrics, mix)
+- [x] `SubsonicInterceptor` — injects auth query params on every request
+- [x] `SubsonicUserHelper` — in-memory session; `serverUrlOverride` for login probing
+- [x] Persistence: `setSessionAndSave()` / `loadIfSaved()` backed by `FinampUser.subsonicPassword`
 
-### Phase 2 — Subsonic API Client
-Replace `jellyfin_api.dart` + `jellyfin_api.chopper.dart`:
-- New file: `lib/services/subsonic_api.dart` — Chopper client for OpenSubsonic endpoints
-- Auth interceptor: injects `u`, `t`, `s`, `v`, `c`, `f=json` query params on every request
-- Mirrors the Chopper pattern used by `jellyfin_api.dart`
+### Phase 3 — Subsonic API Helper ✅ Complete
+`lib/services/subsonic_api_helper.dart`
+- [x] `probeServer(url)` — credential-free server detection for login UI
+- [x] `ping()` → `SubsonicServerInfo` — authenticated ping
+- [x] All browse / search / playlist / scrobble / lyrics / mix methods returning `BaseItemDto`
+- [x] `getCoverArtUrl()` / `getStreamUrl()` / `getDownloadUrl()` — auth URL builders
+- [x] DTO mappers: `_childToDto`, `_artistToDto`, `_albumToDto`, `_playlistToDto`, `_genreToDto`
 
-### Phase 3 — Subsonic API Helper
-Replace `jellyfin_api_helper.dart` with `subsonic_api_helper.dart`:
-- Maps Subsonic responses → `BaseItemDto` / `PlaybackInfoResponse` (synthesized)
-- Builds stream URLs (`/rest/stream.view?...`)
-- Builds artwork URLs (`/rest/getCoverArt.view?...`)
-- Implements scrobble-based playback reporting
+### Phase 4 — Auth & Login Flow ✅ Complete
+- [x] `FinampUser.subsonicPassword` — new HiveField(10); persists Navidrome password alongside server URL + username
+- [x] `SubsonicUserHelper.setSessionAndSave()` / `loadIfSaved()` — Isar-backed persistence
+- [x] GetIt registration: `SubsonicUserHelper` + `SubsonicApiHelper` registered at startup; session restored from Isar
+- [x] Login flow replaced: server URL probe via `probeServer()` → credentials page → `ping()` validates → session saved
+- [x] `login_user_selection_page.dart` removed (Jellyfin-specific: QuickConnect, user listing — no Navidrome equivalent)
+- [x] `LoginServerSelectionPage` now shows `NavidromeServerWidget` on successful probe
+- [x] `LoginAuthenticationPage` authenticates via Subsonic ping; no Jellyfin updateCapabilities
 
-### Phase 4 — Auth & User Model
-- Strip Jellyfin-specific fields from `FinampUser` (access token → store hashed credentials for Subsonic)
-- Update `finamp_user_helper.dart` — remove `getAuthHeader()` / `MediaBrowser` header logic
-- Update login screen to use Navidrome's username+password+token-auth flow
-- Remove QuickConnect UI
-
-### Phase 5 — Wiring & Cleanup
-- Update `metadata_provider.dart` to use synthesized `PlaybackInfoResponse`
-- Update `downloads_service` to use Subsonic download URLs
-- Update `playback_history_service.dart` to call `scrobble` instead of session endpoints
-- Rename app: `finamp` → `naviamp` in `pubspec.yaml`, app ID, display name
+### Phase 5 — Wiring & Cleanup (Next)
+Wire the new Subsonic services into the live app so playback and browsing actually work:
+- [ ] `metadata_provider.dart` — synthesize `PlaybackInfoResponse` / `MediaSourceInfo` from `SubsonicChild` fields
+- [ ] `music_player_background_task.dart` — swap stream URL construction
+- [ ] `downloads_service.dart` — swap download URL construction
+- [ ] `playback_history_service.dart` — replace session endpoints with `scrobble()`
+- [ ] `image provider` — route cover art through `SubsonicApiHelper.getCoverArtUrl()`
+- [ ] `view_selector.dart` / library browsing screens — call `SubsonicApiHelper.getAlbumList2()` etc. instead of Jellyfin
 
 ### Phase 6 — Branding
-- App name, package ID, icon
-- Strip Jellyfin-specific assets/images
+- [ ] App name: `finamp` → `naviamp` in `pubspec.yaml`
+- [ ] Package ID: `com.unicornsonlsd.finamp` → `com.naviamp.naviamp`
+- [ ] Replace icons and splash screen assets
+- [ ] Strip Jellyfin-specific images (`jellyfin-icon-transparent.png`, etc.)
 
 ---
 
@@ -236,3 +256,9 @@ To pull UI improvements from upstream Finamp:
 2. Data model types that the UI references (`BaseItemDto`, etc.) must stay structurally compatible
 3. When pulling upstream changes, conflicts will mostly appear in the service layer — that is expected and intentional
 4. Any UI change that upstream makes to a Jellyfin-specific screen (login, server discovery) will need manual review; everything else should apply cleanly
+
+## Known Limitations / TODOs
+
+- **Password storage security**: `FinampUser.subsonicPassword` stores the password in plaintext in the Isar database. Jellyfin only stores an opaque access token. A future improvement could use the platform keychain (via `flutter_secure_storage`) instead.
+- **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. They will be removed in Phase 5 once Subsonic equivalents are wired up end-to-end.
+- **`FinampUser` Jellyfin fields** (`accessToken`, `serverId`, `views`) are still in the model. For Subsonic logins they are set to empty strings / empty maps. They will be cleaned up in Phase 5/6.

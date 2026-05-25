@@ -1,10 +1,9 @@
 import 'dart:async';
 
 import 'package:finamp/components/LoginScreen/login_server_selection_page.dart';
-import 'package:finamp/models/jellyfin_models.dart';
+import 'package:finamp/models/subsonic_models.dart';
 import 'package:finamp/screens/view_selector.dart';
-import 'package:finamp/services/jellyfin_api_helper.dart';
-import 'package:finamp/services/server_client_discovery_service.dart';
+import 'package:finamp/services/subsonic_api_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get_it/get_it.dart';
@@ -12,7 +11,6 @@ import 'package:logging/logging.dart';
 
 import 'login_authentication_page.dart';
 import 'login_splash_page.dart';
-import 'login_user_selection_page.dart';
 
 class LoginFlow extends StatefulWidget {
   const LoginFlow({super.key});
@@ -24,12 +22,11 @@ class LoginFlow extends StatefulWidget {
 final loginNavigatorKey = GlobalKey<NavigatorState>();
 
 class _LoginFlowState extends State<LoginFlow> {
-  ServerState serverState = ServerState(discoveredServers: {});
+  ServerState serverState = ServerState();
   ConnectionState connectionState = ConnectionState();
 
   @override
   void dispose() {
-    serverState.clientDiscoveryHandler.dispose();
     serverState.connectionTestDebounceTimer?.cancel();
     super.dispose();
   }
@@ -37,7 +34,6 @@ class _LoginFlowState extends State<LoginFlow> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // handle going back inside the nested Navigator while not on the first page
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
@@ -91,26 +87,9 @@ class _LoginFlowState extends State<LoginFlow> {
               route = createRoute(
                 LoginServerSelectionPage(
                   serverState: serverState,
-                  onServerSelected: (PublicSystemInfoResult server, String baseUrl) {
-                    serverState.selectedServer = server;
+                  onServerSelected: (String baseUrl) {
                     serverState.baseUrl = baseUrl;
-                    serverState.clientDiscoveryHandler.stopDiscovery();
-                    loginNavigatorKey.currentState!.pushNamed(LoginUserSelectionPage.routeName);
-                  },
-                ),
-              );
-              break;
-            case LoginUserSelectionPage.routeName:
-              route = createRoute(
-                LoginUserSelectionPage(
-                  serverState: serverState,
-                  connectionState: connectionState,
-                  onUserSelected: (UserDto? user) {
-                    connectionState.selectedUser = user;
                     loginNavigatorKey.currentState!.pushNamed(LoginAuthenticationPage.routeName);
-                  },
-                  onAuthenticated: () {
-                    Navigator.of(context).pushReplacementNamed(ViewSelector.routeName);
                   },
                 ),
               );
@@ -118,62 +97,10 @@ class _LoginFlowState extends State<LoginFlow> {
             case LoginAuthenticationPage.routeName:
               route = createRoute(
                 LoginAuthenticationPage(
+                  serverState: serverState,
                   connectionState: connectionState,
                   onAuthenticated: () {
                     Navigator.of(context).popAndPushNamed(ViewSelector.routeName);
-                    final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-                    jellyfinApiHelper.updateCapabilities(
-                      ClientCapabilities(
-                        supportsMediaControl: true,
-                        supportsPersistentIdentifier: true,
-                        playableMediaTypes: ["Audio"],
-                        supportedCommands: [
-                          "MoveUp",
-                          "MoveDown",
-                          "MoveLeft",
-                          "MoveRight",
-                          "PageUp",
-                          "PageDown",
-                          "PreviousLetter",
-                          "NextLetter",
-                          "ToggleOsd",
-                          "ToggleContextMenu",
-                          "Select",
-                          "Back",
-                          "TakeScreenshot",
-                          "SendKey",
-                          "SendString",
-                          "GoHome",
-                          "GoToSettings",
-                          "VolumeUp",
-                          "VolumeDown",
-                          "Mute",
-                          "Unmute",
-                          "ToggleMute",
-                          "SetVolume",
-                          "SetAudioStreamIndex",
-                          "SetSubtitleStreamIndex",
-                          "ToggleFullscreen",
-                          "DisplayContent",
-                          "GoToSearch",
-                          "DisplayMessage",
-                          "SetRepeatMode",
-                          "ChannelUp",
-                          "ChannelDown",
-                          "Guide",
-                          "ToggleStats",
-                          "PlayMediaSource",
-                          "PlayTrailers",
-                          "SetShuffleQueue",
-                          "PlayState",
-                          "PlayNext",
-                          "ToggleOsdMenu",
-                          "Play",
-                          "SetMaxStreamingBitrate",
-                          "SetPlaybackOrder",
-                        ],
-                      ),
-                    );
                   },
                 ),
               );
@@ -181,7 +108,6 @@ class _LoginFlowState extends State<LoginFlow> {
             default:
               throw Exception('Invalid route: ${settings.name}');
           }
-          // return MaterialPageRoute<void>(builder: builder, settings: settings);
           return route;
         },
       ),
@@ -190,25 +116,15 @@ class _LoginFlowState extends State<LoginFlow> {
 }
 
 class ServerState {
-  final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
-  static final serverStateLogger = Logger("LoginServerState");
+  static final _log = Logger("LoginServerState");
 
-  PublicSystemInfoResult? manualServer;
-  Map<Uri, PublicSystemInfoResult> discoveredServers;
-  PublicSystemInfoResult? selectedServer;
+  final subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
+
+  SubsonicServerInfo? detectedServer;
   String? baseUrl;
   Timer? connectionTestDebounceTimer;
   String? baseUrlToTest;
-  JellyfinServerClientDiscovery clientDiscoveryHandler;
   VoidCallback? updateCallback;
-
-  ServerState({
-    required this.discoveredServers,
-    this.updateCallback,
-    this.manualServer,
-    this.selectedServer,
-    this.baseUrl,
-  }) : clientDiscoveryHandler = JellyfinServerClientDiscovery();
 
   void onBaseUrlChanged(String baseUrl) {
     if (connectionTestDebounceTimer?.isActive ?? false) {
@@ -223,92 +139,47 @@ class ServerState {
         baseUrlToTest = null;
         updateCallback?.call();
       } catch (err) {
-        // nop, make sure *not* to reset the baseUrlToTest
+        // nop
       }
     });
   }
 
   Future<void> testServerConnection(String baseUrl) async {
-    if (baseUrl.isNotEmpty) {
-      bool unspecifiedProtocol = false;
-      bool unspecifiedPort = false;
+    String urlToTest = baseUrl.trim();
+    if (!(urlToTest.startsWith("http://") || urlToTest.startsWith("https://"))) {
+      urlToTest = "https://$urlToTest";
+    }
+    if (urlToTest.endsWith("/")) {
+      urlToTest = urlToTest.substring(0, urlToTest.length - 1);
+    }
 
-      String baseUrlToTest = baseUrl;
+    final info = await subsonicApiHelper.probeServer(urlToTest);
+    if (this.baseUrlToTest != baseUrl) {
+      throw Exception("Server URL changed while testing");
+    }
 
-      // We trim the base url in case the user accidentally added some trailing whitespace
-      baseUrlToTest = baseUrlToTest.trim();
-
-      if (!(baseUrlToTest.startsWith("http://") || baseUrlToTest.startsWith("https://"))) {
-        // use https by default
-        baseUrlToTest = "https://$baseUrlToTest";
-        unspecifiedProtocol = true;
-      }
-
-      // use regex to check if a port is specified
-      final portRegex = RegExp(r"[^\/]:\d+");
-      if (!portRegex.hasMatch(baseUrlToTest)) {
-        unspecifiedPort = true;
-      }
-
-      if (baseUrlToTest.endsWith("/")) {
-        baseUrlToTest = baseUrlToTest.substring(0, baseUrlToTest.length - 1);
-      }
-
-      jellyfinApiHelper.baseUrlTemp = Uri.parse(baseUrlToTest);
-
-      PublicSystemInfoResult? publicServerInfo;
-      try {
-        publicServerInfo = await jellyfinApiHelper.loadServerPublicInfo();
-      } catch (error) {
-        serverStateLogger.severe("Error loading server info: $error");
-      }
-      if (this.baseUrlToTest != baseUrl) {
+    if (info != null) {
+      detectedServer = info;
+      baseUrl = urlToTest;
+    } else if (!urlToTest.startsWith("https://")) {
+      // Retry with http if https failed
+      final httpUrl = urlToTest.replaceFirst("https://", "http://");
+      final httpInfo = await subsonicApiHelper.probeServer(httpUrl);
+      if (baseUrlToTest != baseUrl) {
         throw Exception("Server URL changed while testing");
       }
-
-      if (publicServerInfo == null && unspecifiedProtocol) {
-        // try http
-        Uri url = Uri.parse(baseUrlToTest).replace(scheme: "http");
-        baseUrlToTest = url.toString(); // update the local url
-        jellyfinApiHelper.baseUrlTemp = url;
-        try {
-          publicServerInfo = await jellyfinApiHelper.loadServerPublicInfo();
-        } catch (error) {
-          serverStateLogger.severe("Error loading server info: $error");
-        }
-      }
-      if (this.baseUrlToTest != baseUrl) {
-        throw Exception("Server URL changed while testing");
-      }
-
-      if (publicServerInfo == null && unspecifiedPort) {
-        // try default port 8096
-        Uri url = Uri.parse(baseUrlToTest).replace(port: 8096);
-        baseUrlToTest = url.toString(); // update the local url
-        jellyfinApiHelper.baseUrlTemp = url;
-        try {
-          publicServerInfo = await jellyfinApiHelper.loadServerPublicInfo();
-        } catch (error) {
-          serverStateLogger.severe("Error loading server info: $error");
-        }
-      }
-      if (this.baseUrlToTest != baseUrl) {
-        throw Exception("Server URL changed while testing");
-      }
-
-      if (publicServerInfo != null) {
-        manualServer = publicServerInfo;
-        this.baseUrl = baseUrlToTest;
+      if (httpInfo != null) {
+        detectedServer = httpInfo;
+        baseUrl = httpUrl;
       }
     }
+    _log.fine('Server probe result: ${detectedServer?.serverVersion}');
   }
 }
 
 class ConnectionState {
   bool isConnected;
   bool isAuthenticating;
-  QuickConnectState? quickConnectState;
-  UserDto? selectedUser;
 
-  ConnectionState({this.isConnected = false, this.isAuthenticating = false, this.quickConnectState, this.selectedUser});
+  ConnectionState({this.isConnected = false, this.isAuthenticating = false});
 }

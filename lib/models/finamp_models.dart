@@ -44,6 +44,7 @@ class FinampUser {
     required this.serverId,
     this.currentViewId,
     this.views = const {},
+    this.subsonicPassword,
   });
 
   @HiveField(0)
@@ -79,6 +80,9 @@ class FinampUser {
 
   @HiveField(9, defaultValue: DefaultSettings.preferLocalNetwork)
   bool preferLocalNetwork;
+
+  @HiveField(10)
+  String? subsonicPassword;
 
   // We only need 1 user, the current user
   final Id isarId = 0;

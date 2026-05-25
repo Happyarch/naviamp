@@ -35,13 +35,14 @@ class FinampUserAdapter extends TypeAdapter<FinampUser> {
       views: fields[5] == null
           ? const {}
           : (fields[5] as Map).cast<BaseItemId, BaseItemDto>(),
+      subsonicPassword: fields[10] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, FinampUser obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +60,9 @@ class FinampUserAdapter extends TypeAdapter<FinampUser> {
       ..writeByte(8)
       ..write(obj.isLocal)
       ..writeByte(9)
-      ..write(obj.preferLocalNetwork);
+      ..write(obj.preferLocalNetwork)
+      ..writeByte(10)
+      ..write(obj.subsonicPassword);
   }
 
   @override
@@ -3252,6 +3255,11 @@ const FinampUserSchema = CollectionSchema(
       name: r'serverId',
       type: IsarType.string,
     ),
+    r'subsonicPassword': PropertySchema(
+      id: 10,
+      name: r'subsonicPassword',
+      type: IsarType.string,
+    ),
   },
 
   estimateSize: _finampUserEstimateSize,
@@ -3288,6 +3296,12 @@ int _finampUserEstimateSize(
   bytesCount += 3 + object.isarViews.length * 3;
   bytesCount += 3 + object.localAddress.length * 3;
   bytesCount += 3 + object.serverId.length * 3;
+  {
+    final value = object.subsonicPassword;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -3307,6 +3321,7 @@ void _finampUserSerialize(
   writer.writeString(offsets[7], object.localAddress);
   writer.writeBool(offsets[8], object.preferLocalNetwork);
   writer.writeString(offsets[9], object.serverId);
+  writer.writeString(offsets[10], object.subsonicPassword);
 }
 
 FinampUser _finampUserDeserialize(
@@ -3323,6 +3338,7 @@ FinampUser _finampUserDeserialize(
     localAddress: reader.readString(offsets[7]),
     preferLocalNetwork: reader.readBool(offsets[8]),
     serverId: reader.readString(offsets[9]),
+    subsonicPassword: reader.readStringOrNull(offsets[10]),
   );
   object.isarCurrentViewId = reader.readStringOrNull(offsets[3]);
   object.isarViews = reader.readString(offsets[6]);
@@ -3356,6 +3372,8 @@ P _finampUserDeserializeProp<P>(
       return (reader.readBool(offset)) as P;
     case 9:
       return (reader.readString(offset)) as P;
+    case 10:
+      return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -4706,6 +4724,165 @@ extension FinampUserQueryFilter
       );
     });
   }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'subsonicPassword'),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'subsonicPassword'),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'subsonicPassword',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'subsonicPassword',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'subsonicPassword',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'subsonicPassword',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'subsonicPassword',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'subsonicPassword',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'subsonicPassword',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'subsonicPassword',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'subsonicPassword', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  subsonicPasswordIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'subsonicPassword', value: ''),
+      );
+    });
+  }
 }
 
 extension FinampUserQueryObject
@@ -4836,6 +5013,19 @@ extension FinampUserQuerySortBy
   QueryBuilder<FinampUser, FinampUser, QAfterSortBy> sortByServerIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'serverId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy> sortBySubsonicPassword() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'subsonicPassword', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  sortBySubsonicPasswordDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'subsonicPassword', Sort.desc);
     });
   }
 }
@@ -4976,6 +5166,19 @@ extension FinampUserQuerySortThenBy
       return query.addSortBy(r'serverId', Sort.desc);
     });
   }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy> thenBySubsonicPassword() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'subsonicPassword', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  thenBySubsonicPasswordDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'subsonicPassword', Sort.desc);
+    });
+  }
 }
 
 extension FinampUserQueryWhereDistinct
@@ -5059,6 +5262,17 @@ extension FinampUserQueryWhereDistinct
       return query.addDistinctBy(r'serverId', caseSensitive: caseSensitive);
     });
   }
+
+  QueryBuilder<FinampUser, FinampUser, QDistinct> distinctBySubsonicPassword({
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'subsonicPassword',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
 }
 
 extension FinampUserQueryProperty
@@ -5128,6 +5342,13 @@ extension FinampUserQueryProperty
   QueryBuilder<FinampUser, String, QQueryOperations> serverIdProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'serverId');
+    });
+  }
+
+  QueryBuilder<FinampUser, String?, QQueryOperations>
+  subsonicPasswordProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'subsonicPassword');
     });
   }
 }

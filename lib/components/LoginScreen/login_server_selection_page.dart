@@ -1,12 +1,9 @@
 import 'package:finamp/components/Buttons/simple_button.dart';
 import 'package:finamp/components/finamp_icon.dart';
-import 'package:finamp/models/jellyfin_models.dart';
-import 'package:finamp/services/jellyfin_api_helper.dart';
-import 'package:flutter/material.dart';
 import 'package:finamp/l10n/app_localizations.dart';
+import 'package:finamp/models/subsonic_models.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_tabler_icons/flutter_tabler_icons.dart';
-import 'package:get_it/get_it.dart';
-import 'package:logging/logging.dart';
 
 import 'login_flow.dart';
 
@@ -14,7 +11,7 @@ class LoginServerSelectionPage extends StatefulWidget {
   static const routeName = "login/server-selection";
 
   final ServerState serverState;
-  final void Function(PublicSystemInfoResult server, String baseUrl)? onServerSelected;
+  final void Function(String baseUrl)? onServerSelected;
 
   const LoginServerSelectionPage({super.key, required this.serverState, this.onServerSelected});
 
@@ -23,46 +20,14 @@ class LoginServerSelectionPage extends StatefulWidget {
 }
 
 class _LoginServerSelectionPageState extends State<LoginServerSelectionPage> {
-  static final _loginServerSelectionPageLogger = Logger("LoginServerSelectionPage");
-
-  final jellyfinApiHelper = GetIt.instance<JellyfinApiHelper>();
   final formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
-
     widget.serverState.updateCallback = () {
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     };
-
-    widget.serverState.clientDiscoveryHandler.discoverServers((ClientDiscoveryResponse response) async {
-      _loginServerSelectionPageLogger.finer("Found server: ${response.name} at ${response.address}");
-
-      final serverUrl = Uri.parse(response.address!);
-      PublicSystemInfoResult? serverInfo = await jellyfinApiHelper.loadCustomServerPublicInfo(serverUrl);
-      _loginServerSelectionPageLogger.finer("Server info: ${serverInfo?.toJson()}");
-      if (serverInfo != null && mounted) {
-        if (serverInfo.serverName == null) {
-          serverInfo.serverName = response.name;
-        } else if (serverInfo.serverName != response.name) {
-          serverInfo.serverName = "${serverInfo.serverName} (${response.name})";
-          serverInfo.localAddress = response.address ?? response.endpointAddress ?? serverInfo.localAddress;
-        }
-        // no need to filter duplicates, we're using a map
-        setState(() {
-          widget.serverState.discoveredServers[serverUrl] = serverInfo;
-        });
-      }
-    });
-  }
-
-  @override
-  void deactivate() {
-    widget.serverState.clientDiscoveryHandler.dispose();
-    super.deactivate();
   }
 
   @override
@@ -89,7 +54,7 @@ class _LoginServerSelectionPageState extends State<LoginServerSelectionPage> {
                     icon: TablerIcons.chevron_left,
                     text: AppLocalizations.of(context)!.back,
                     onPressed: () {
-                      widget.serverState.manualServer = null;
+                      widget.serverState.detectedServer = null;
                       Navigator.of(context).pop();
                     },
                   ),
@@ -98,7 +63,7 @@ class _LoginServerSelectionPageState extends State<LoginServerSelectionPage> {
               _buildServerUrlInput(context),
               ConstrainedBox(
                 constraints: const BoxConstraints(minHeight: 95.0),
-                child: widget.serverState.baseUrlToTest != null && widget.serverState.manualServer == null
+                child: widget.serverState.baseUrlToTest != null && widget.serverState.detectedServer == null
                     ? Padding(
                         padding: const EdgeInsets.only(top: 12.0),
                         child: Row(
@@ -114,79 +79,18 @@ class _LoginServerSelectionPageState extends State<LoginServerSelectionPage> {
                         ),
                       )
                     : Visibility(
-                        visible: widget.serverState.manualServer != null,
+                        visible: widget.serverState.detectedServer != null,
                         child: Padding(
                           padding: const EdgeInsets.only(top: 12.0),
-                          child: JellyfinServerSelectionWidget(
+                          child: NavidromeServerWidget(
                             baseUrl: widget.serverState.baseUrl,
-                            serverInfo: widget.serverState.manualServer,
+                            serverInfo: widget.serverState.detectedServer,
                             onPressed: () {
-                              widget.onServerSelected?.call(
-                                widget.serverState.manualServer!,
-                                widget.serverState.baseUrl!,
-                              );
+                              widget.onServerSelected?.call(widget.serverState.baseUrl!);
                             },
                           ),
                         ),
                       ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 20.0, bottom: 16.0),
-                child: Text(
-                  AppLocalizations.of(context)!.loginFlowLocalNetworkServers,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-              SizedBox(
-                height: 180,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  clipBehavior: Clip.antiAlias,
-                  itemCount: widget.serverState.discoveredServers.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index < widget.serverState.discoveredServers.length) {
-                      // get key and value
-                      final entry = widget.serverState.discoveredServers.entries.elementAt(index);
-                      final serverUrl = entry.key;
-                      final serverInfo = entry.value;
-                      return Padding(
-                        key: ValueKey(serverUrl),
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: JellyfinServerSelectionWidget(
-                          baseUrl: null,
-                          serverInfo: serverInfo,
-                          onPressed: () {
-                            widget.onServerSelected?.call(serverInfo, serverUrl.toString());
-                          },
-                        ),
-                      );
-                    } else {
-                      // show loading indicator below list of discovered servers
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 12.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: SizedBox(
-                                height: 20.0,
-                                width: 20.0,
-                                child: CircularProgressIndicator(strokeWidth: 2.0),
-                              ),
-                            ),
-                            const SizedBox(width: 8.0),
-                            Text(
-                              AppLocalizations.of(context)!.loginFlowLocalNetworkServersScanningForServers,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                  },
-                ),
               ),
             ],
           ),
@@ -196,8 +100,6 @@ class _LoginServerSelectionPageState extends State<LoginServerSelectionPage> {
   }
 
   Form _buildServerUrlInput(BuildContext context) {
-    // This variable is for handling shifting focus when the user presses submit.
-    // https://stackoverflow.com/questions/52150677/how-to-shift-focus-to-next-textfield-in-flutter
     final node = FocusScope.of(context);
 
     InputDecoration inputFieldDecoration(String placeholder) {
@@ -247,14 +149,14 @@ class _LoginServerSelectionPageState extends State<LoginServerSelectionPage> {
               textInputAction: TextInputAction.next,
               onEditingComplete: () => node.nextFocus(),
               onChanged: (value) async {
-                widget.serverState.manualServer = null;
+                widget.serverState.detectedServer = null;
                 widget.serverState.baseUrl = value;
-                if (formKey.currentState?.validate() == true) {
+                if (formKey.currentState?.validate() ?? false) {
                   widget.serverState.onBaseUrlChanged(value);
                 }
               },
               validator: (value) {
-                if (value?.isEmpty == true) {
+                if (value?.isEmpty ?? false) {
                   return AppLocalizations.of(context)!.emptyServerUrl;
                 }
                 return null;
@@ -268,18 +170,16 @@ class _LoginServerSelectionPageState extends State<LoginServerSelectionPage> {
   }
 }
 
-class JellyfinServerSelectionWidget extends StatelessWidget {
+class NavidromeServerWidget extends StatelessWidget {
   final String? baseUrl;
-  final PublicSystemInfoResult? serverInfo;
+  final SubsonicServerInfo? serverInfo;
   final void Function()? onPressed;
-  final bool? connected;
 
-  const JellyfinServerSelectionWidget({
+  const NavidromeServerWidget({
     super.key,
     required this.baseUrl,
     required this.serverInfo,
     this.onPressed,
-    this.connected,
   });
 
   @override
@@ -288,7 +188,7 @@ class JellyfinServerSelectionWidget extends StatelessWidget {
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset('images/jellyfin-icon-transparent.png', width: 36, height: 36),
+          const Icon(TablerIcons.music, size: 36),
           const SizedBox(width: 12.0),
           Expanded(
             child: Column(
@@ -297,16 +197,13 @@ class JellyfinServerSelectionWidget extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  serverInfo?.serverName ?? "",
+                  "Navidrome",
                   style: Theme.of(context).textTheme.titleMedium,
-                  softWrap: true,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                Text("v${serverInfo?.version}", style: Theme.of(context).textTheme.bodySmall),
-                if (baseUrl != null) Text(baseUrl ?? "", style: Theme.of(context).textTheme.bodySmall),
-                if (serverInfo?.localAddress != baseUrl)
-                  Text(serverInfo?.localAddress ?? "", style: Theme.of(context).textTheme.bodySmall),
+                if (serverInfo?.serverVersion != null)
+                  Text("v${serverInfo!.serverVersion}", style: Theme.of(context).textTheme.bodySmall),
+                if (baseUrl != null)
+                  Text(baseUrl!, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),

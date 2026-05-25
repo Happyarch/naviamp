@@ -1,4 +1,8 @@
+import 'package:get_it/get_it.dart';
 import 'package:logging/logging.dart';
+
+import '../models/finamp_models.dart';
+import 'finamp_user_helper.dart';
 
 final _log = Logger('SubsonicUserHelper');
 
@@ -43,5 +47,39 @@ class SubsonicUserHelper {
     _credentials = null;
     serverUrlOverride = null;
     _log.info('Subsonic session cleared');
+  }
+
+  /// Restores a saved session from the [FinampUser] stored in Isar, if one
+  /// exists and has Subsonic credentials.
+  void loadIfSaved() {
+    final user = GetIt.instance<FinampUserHelper>().currentUser;
+    if (user?.subsonicPassword != null) {
+      setSession(
+        serverUrl: user!.publicAddress,
+        username: user.id,
+        password: user.subsonicPassword!,
+      );
+    }
+  }
+
+  /// Sets the in-memory session and persists the credentials to Isar so they
+  /// survive app restarts.
+  Future<void> setSessionAndSave({
+    required String serverUrl,
+    required String username,
+    required String password,
+  }) async {
+    setSession(serverUrl: serverUrl, username: username, password: password);
+    final user = FinampUser(
+      id: username,
+      publicAddress: serverUrl,
+      localAddress: serverUrl,
+      isLocal: false,
+      preferLocalNetwork: false,
+      accessToken: '',
+      serverId: '',
+      subsonicPassword: password,
+    );
+    await GetIt.instance<FinampUserHelper>().saveUser(user);
   }
 }
