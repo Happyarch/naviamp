@@ -131,6 +131,37 @@ class SubsonicApiHelper {
     return (list.album ?? <SubsonicAlbumID3>[]).map(_albumToDto).toList();
   }
 
+  /// Returns just the song [BaseItemDto] for a given song ID, or null on error.
+  Future<BaseItemDto?> getSongDto(String id) async {
+    try {
+      final inner = _unwrap(await _api.getSong(id: id));
+      final song = SubsonicChild.fromJson(inner['song'] as Map<String, dynamic>);
+      return _childToDto(song);
+    } catch (e) {
+      _log.warning('getSongDto failed for $id: $e');
+      return null;
+    }
+  }
+
+  /// Fetches all albums (paginated) for the given music folder, or all folders
+  /// if [musicFolderId] is null. Stops when a page returns fewer than [pageSize].
+  Future<List<BaseItemDto>> getAllAlbums({int? musicFolderId, int pageSize = 500}) async {
+    final albums = <BaseItemDto>[];
+    var offset = 0;
+    while (true) {
+      final page = await getAlbumList2(
+        type: 'alphabeticalByName',
+        size: pageSize,
+        offset: offset,
+        musicFolderId: musicFolderId,
+      );
+      albums.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return albums;
+  }
+
   // ── Songs ─────────────────────────────────────────────────────────────────
 
   Future<List<BaseItemDto>> getRandomSongs({

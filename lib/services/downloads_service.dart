@@ -8,6 +8,7 @@ import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
+import 'package:finamp/services/subsonic_api_helper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -758,18 +759,17 @@ class DownloadsService {
         .filter()
         .typeEqualTo(DownloadItemType.track)
         .findAllSync();
-    final JellyfinApiHelper jellyfinApiData = GetIt.instance<JellyfinApiHelper>();
+    final subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
     for (var item in allItems) {
-      if (item.baseItem?.mediaStreams?.any((stream) => stream.type == "Lyric") ?? false) {
-        idsWithLyrics[item.isarId] = null;
-        LyricDto? lyrics;
-        try {
-          lyrics = await jellyfinApiData.getLyrics(itemId: BaseItemId(item.id));
+      idsWithLyrics[item.isarId] = null;
+      try {
+        final lyrics = await subsonicApiHelper.getLyricsAsDto(item.id);
+        if (lyrics != null) {
           _downloadsLogger.finest("Fetched lyrics for ${item.name}");
           idsWithLyrics[item.isarId] = lyrics;
-        } catch (e) {
-          _downloadsLogger.warning("Failed to fetch lyrics for ${item.name}.");
         }
+      } catch (e) {
+        _downloadsLogger.warning("Failed to fetch lyrics for ${item.name}.");
       }
     }
     _isar.writeTxnSync(() {

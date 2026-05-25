@@ -232,7 +232,7 @@ Functionally equivalent: `getPlaylists`, `getPlaylist(id)`, `createPlaylist`, `u
 - [x] `LoginServerSelectionPage` now shows `NavidromeServerWidget` on successful probe
 - [x] `LoginAuthenticationPage` authenticates via Subsonic ping; no Jellyfin updateCapabilities
 
-### Phase 5 — Wiring & Cleanup ✅ Mostly Complete
+### Phase 5 — Wiring & Cleanup ✅ Complete
 Wire the new Subsonic services into the live app so playback and browsing actually work:
 - [x] **Password security** — `flutter_secure_storage` replaces plaintext `subsonicPassword`; Android Keystore on Android, libsecret/Secret Service on Linux; migration from old plaintext storage on first run
 - [x] `album_image_provider.dart` — routed cover art through `SubsonicApiHelper.getCoverArtUrl()`
@@ -240,7 +240,8 @@ Wire the new Subsonic services into the live app so playback and browsing actual
 - [x] `metadata_provider.dart` — synthesizes `PlaybackInfoResponse`/`MediaSourceInfo` from `SubsonicChild` fields stored in `BaseItemDto.mediaSources` by `_childToDto`; fetches lyrics via `getLyricsAsDto()` → `LyricDto`; no server round-trip for basic playback metadata
 - [x] `playback_history_service.dart` — replaced Jellyfin session endpoints with `SubsonicApiHelper.scrobble()`; `submission: false` for now-playing, `submission: true` for track completion
 - [x] `music_player_background_task.dart` — `_trackUri()` replaced: direct play → `getStreamUrl(item)` (original file); transcode → `getStreamUrl(item, format: subsonicFormat, maxBitRate: kbps)`; `FinampTranscodingStreamingFormat.codec` maps directly to Subsonic format names (vorbis → "ogg")
-- [ ] `downloads_service.dart` — swap download URL construction
+- [x] `downloads_service_backend.dart` — `IsarTaskQueue` now uses `SubsonicApiHelper.getDownloadUrl()` / `getStreamUrl()` / `getCoverArtUrl()` for all download URL construction; Subsonic auth is in query params so no `Authorization` header is set; `DownloadsSyncService._getCollectionInfo/Children/_getFinampCollectionChildren` fully rewritten to use Subsonic endpoints dispatched by item type; lyrics fetched unconditionally via `getLyricsAsDto()` (no Jellyfin MediaStream check needed)
+- [x] `downloads_service.dart` — repair step 4 lyrics fetch replaced with `SubsonicApiHelper.getLyricsAsDto()`; `getSong` endpoint added to `subsonic_api.dart` for per-song metadata fetches; `toJson()` instance methods added to all `@JsonSerializable` Subsonic model classes (required by `explicitToJson: true` on parent classes)
 
 ### Phase 6 — Branding
 - [ ] App name: `finamp` → `naviamp` in `pubspec.yaml`
@@ -260,6 +261,7 @@ To pull UI improvements from upstream Finamp:
 
 ## Known Limitations / TODOs
 
-- **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. They will be removed once Subsonic equivalents are wired up end-to-end (Phase 5 remaining: stream URL in `music_player_background_task.dart`, download URL in `downloads_service.dart`).
-- **`FinampUser` Jellyfin fields** (`accessToken`, `serverId`, `views`) are still in the model. For Subsonic logins they are set to empty strings / empty maps. They will be cleaned up in Phase 5/6.
+- **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. `JellyfinApiHelper` is retained only for its `runInIsolate()` utility used in `downloads_service.dart`. Both files should be pruned / replaced in Phase 6.
+- **`FinampUser` Jellyfin fields** (`accessToken`, `serverId`, `views`) are still in the model. For Subsonic logins they are set to empty strings / empty maps. They will be cleaned up in Phase 6.
 - **`FinampUser.subsonicPassword`** field still exists in the model for migration reading (detects and migrates plaintext passwords from old installs to secure storage on first run). It is no longer written by new code. Can be removed in Phase 6 after migration window.
+- **Music browsing layer** (`music_screen_tab_view.dart` and associated Riverpod providers) still calls Jellyfin-backed providers for artist/album/song listing. This is the main remaining functionality gap — the app can log in, play, and download, but browsing the library is not yet wired to Subsonic.

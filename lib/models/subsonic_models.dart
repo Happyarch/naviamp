@@ -57,6 +57,7 @@ class SubsonicMusicFolder {
 
   factory SubsonicMusicFolder.fromJson(Map<String, dynamic> json) =>
       _$SubsonicMusicFolderFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicMusicFolderToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -67,6 +68,7 @@ class SubsonicMusicFolders {
 
   factory SubsonicMusicFolders.fromJson(Map<String, dynamic> json) =>
       _$SubsonicMusicFoldersFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicMusicFoldersToJson(this);
 }
 
 // ─── Genres ───────────────────────────────────────────────────────────────────
@@ -85,6 +87,7 @@ class SubsonicGenre {
 
   factory SubsonicGenre.fromJson(Map<String, dynamic> json) =>
       _$SubsonicGenreFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicGenreToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -95,6 +98,7 @@ class SubsonicGenres {
 
   factory SubsonicGenres.fromJson(Map<String, dynamic> json) =>
       _$SubsonicGenresFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicGenresToJson(this);
 }
 
 /// OpenSubsonic: a genre tag on an album or song.
@@ -106,6 +110,7 @@ class SubsonicItemGenre {
 
   factory SubsonicItemGenre.fromJson(Map<String, dynamic> json) =>
       _$SubsonicItemGenreFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicItemGenreToJson(this);
 }
 
 // ─── ReplayGain (OpenSubsonic) ────────────────────────────────────────────────
@@ -130,6 +135,7 @@ class SubsonicReplayGain {
 
   factory SubsonicReplayGain.fromJson(Map<String, dynamic> json) =>
       _$SubsonicReplayGainFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicReplayGainToJson(this);
 }
 
 // ─── Contributor types (OpenSubsonic) ────────────────────────────────────────
@@ -145,6 +151,7 @@ class SubsonicArtistRef {
 
   factory SubsonicArtistRef.fromJson(Map<String, dynamic> json) =>
       _$SubsonicArtistRefFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicArtistRefToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -157,6 +164,7 @@ class SubsonicContributor {
 
   factory SubsonicContributor.fromJson(Map<String, dynamic> json) =>
       _$SubsonicContributorFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicContributorToJson(this);
 }
 
 @JsonSerializable()
@@ -167,6 +175,7 @@ class SubsonicRecordLabel {
 
   factory SubsonicRecordLabel.fromJson(Map<String, dynamic> json) =>
       _$SubsonicRecordLabelFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicRecordLabelToJson(this);
 }
 
 @JsonSerializable()
@@ -178,6 +187,7 @@ class SubsonicDiscTitle {
 
   factory SubsonicDiscTitle.fromJson(Map<String, dynamic> json) =>
       _$SubsonicDiscTitleFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicDiscTitleToJson(this);
 }
 
 // ─── Artist ───────────────────────────────────────────────────────────────────
@@ -212,6 +222,7 @@ class SubsonicArtistID3 {
 
   factory SubsonicArtistID3.fromJson(Map<String, dynamic> json) =>
       _$SubsonicArtistID3FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicArtistID3ToJson(this);
 }
 
 @JsonSerializable()
@@ -223,6 +234,7 @@ class SubsonicIndexID3 {
 
   factory SubsonicIndexID3.fromJson(Map<String, dynamic> json) =>
       _$SubsonicIndexID3FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicIndexID3ToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -234,6 +246,7 @@ class SubsonicArtistsID3 {
 
   factory SubsonicArtistsID3.fromJson(Map<String, dynamic> json) =>
       _$SubsonicArtistsID3FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicArtistsID3ToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -256,6 +269,7 @@ class SubsonicArtistWithAlbumsID3 extends SubsonicArtistID3 {
 
   factory SubsonicArtistWithAlbumsID3.fromJson(Map<String, dynamic> json) =>
       _$SubsonicArtistWithAlbumsID3FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicArtistWithAlbumsID3ToJson(this);
 }
 
 // ─── Album ────────────────────────────────────────────────────────────────────
@@ -326,6 +340,7 @@ class SubsonicAlbumID3 {
 
   factory SubsonicAlbumID3.fromJson(Map<String, dynamic> json) =>
       _$SubsonicAlbumID3FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicAlbumID3ToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -366,6 +381,7 @@ class SubsonicAlbumWithSongsID3 extends SubsonicAlbumID3 {
 
   factory SubsonicAlbumWithSongsID3.fromJson(Map<String, dynamic> json) =>
       _$SubsonicAlbumWithSongsID3FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicAlbumWithSongsID3ToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -376,6 +392,7 @@ class SubsonicAlbumList2 {
 
   factory SubsonicAlbumList2.fromJson(Map<String, dynamic> json) =>
       _$SubsonicAlbumList2FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicAlbumList2ToJson(this);
 }
 
 // ─── Song (Child) ─────────────────────────────────────────────────────────────
@@ -479,6 +496,7 @@ class SubsonicChild {
 
   factory SubsonicChild.fromJson(Map<String, dynamic> json) =>
       _$SubsonicChildFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicChildToJson(this);
 }
 
 /// Song list returned by: getRandomSongs, getSimilarSongs2, getTopSongs, getInstantMix.
@@ -491,6 +509,7 @@ class SubsonicSongList {
 
   factory SubsonicSongList.fromJson(Map<String, dynamic> json) =>
       _$SubsonicSongListFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicSongListToJson(this);
 }
 
 /// getSongsByGenre uses 'child' instead of 'song' as the array key.
@@ -502,6 +521,7 @@ class SubsonicSongsByGenre {
 
   factory SubsonicSongsByGenre.fromJson(Map<String, dynamic> json) =>
       _$SubsonicSongsByGenreFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicSongsByGenreToJson(this);
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
@@ -516,6 +536,7 @@ class SubsonicSearchResult3 {
 
   factory SubsonicSearchResult3.fromJson(Map<String, dynamic> json) =>
       _$SubsonicSearchResult3FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicSearchResult3ToJson(this);
 }
 
 // ─── Starred ──────────────────────────────────────────────────────────────────
@@ -530,6 +551,7 @@ class SubsonicStarred2 {
 
   factory SubsonicStarred2.fromJson(Map<String, dynamic> json) =>
       _$SubsonicStarred2FromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicStarred2ToJson(this);
 }
 
 // ─── Playlists ────────────────────────────────────────────────────────────────
@@ -564,6 +586,7 @@ class SubsonicPlaylist {
 
   factory SubsonicPlaylist.fromJson(Map<String, dynamic> json) =>
       _$SubsonicPlaylistFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicPlaylistToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -588,6 +611,8 @@ class SubsonicPlaylistWithSongs extends SubsonicPlaylist {
 
   factory SubsonicPlaylistWithSongs.fromJson(Map<String, dynamic> json) =>
       _$SubsonicPlaylistWithSongsFromJson(json);
+  @override
+  Map<String, dynamic> toJson() => _$SubsonicPlaylistWithSongsToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -598,6 +623,7 @@ class SubsonicPlaylists {
 
   factory SubsonicPlaylists.fromJson(Map<String, dynamic> json) =>
       _$SubsonicPlaylistsFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicPlaylistsToJson(this);
 }
 
 // ─── Lyrics ───────────────────────────────────────────────────────────────────
@@ -612,6 +638,7 @@ class SubsonicLyricLine {
 
   factory SubsonicLyricLine.fromJson(Map<String, dynamic> json) =>
       _$SubsonicLyricLineFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicLyricLineToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -634,6 +661,7 @@ class SubsonicStructuredLyrics {
 
   factory SubsonicStructuredLyrics.fromJson(Map<String, dynamic> json) =>
       _$SubsonicStructuredLyricsFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicStructuredLyricsToJson(this);
 }
 
 @JsonSerializable(explicitToJson: true)
@@ -644,6 +672,7 @@ class SubsonicLyricsList {
 
   factory SubsonicLyricsList.fromJson(Map<String, dynamic> json) =>
       _$SubsonicLyricsListFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicLyricsListToJson(this);
 }
 
 // ─── User ─────────────────────────────────────────────────────────────────────
@@ -686,6 +715,7 @@ class SubsonicUser {
 
   factory SubsonicUser.fromJson(Map<String, dynamic> json) =>
       _$SubsonicUserFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicUserToJson(this);
 }
 
 // ─── Scan status ──────────────────────────────────────────────────────────────
@@ -707,6 +737,7 @@ class SubsonicScanStatus {
 
   factory SubsonicScanStatus.fromJson(Map<String, dynamic> json) =>
       _$SubsonicScanStatusFromJson(json);
+  Map<String, dynamic> toJson() => _$SubsonicScanStatusToJson(this);
 }
 
 // ─── Server info ──────────────────────────────────────────────────────────────

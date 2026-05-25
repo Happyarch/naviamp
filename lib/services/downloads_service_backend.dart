@@ -18,10 +18,11 @@ import 'package:uuid/uuid.dart';
 
 import '../models/finamp_models.dart';
 import '../models/jellyfin_models.dart';
+import '../models/subsonic_models.dart';
 import '../screens/downloads_screen.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
-import 'jellyfin_api_helper.dart';
+import 'subsonic_api_helper.dart';
 
 part 'downloads_service_backend.g.dart';
 
@@ -230,7 +231,7 @@ class SyncNode {
 class IsarTaskQueue implements TaskQueue {
   static final _enqueueLog = Logger('IsarTaskQueue');
   final DownloadsService _downloadsService;
-  final _jellyfinApiData = GetIt.instance<JellyfinApiHelper>();
+  final _subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
 
   IsarTaskQueue(this._downloadsService);
@@ -316,39 +317,49 @@ class IsarTaskQueue implements TaskQueue {
         if (nextTasks.isEmpty || !_downloadsService.allowDownloads || FinampSettingsHelper.finampSettings.isOffline) {
           return;
         }
+        taskLoop:
         for (var task in nextTasks) {
           if (task.file == null) {
             _enqueueLog.severe("Received ${task.name} with no valid file path.");
             _isar.writeTxnSync(() {
               _downloadsService.updateItemState(task, DownloadItemState.failed);
             });
-            continue;
+            continue taskLoop;
           }
           while (_activeDownloads.length >= FinampSettingsHelper.finampSettings.maxConcurrentDownloads ||
               _finampUserHelper.currentUser == null) {
             await Future.delayed(const Duration(milliseconds: 500));
           }
+          // Compute URL before scheduleTask so we can skip this task if needed.
+          final String url;
+          final profile = task.fileTranscodingProfile;
+          switch (task.type) {
+            case DownloadItemType.track:
+              if (profile == null || profile.codec == FinampTranscodingCodec.original) {
+                url = _subsonicApiHelper.getDownloadUrl(task.baseItem!).toString();
+              } else {
+                // profile.codec.container is the Subsonic format name ("aac","mp3","ogg")
+                final maxBitRateKbps = profile.stereoBitrate ~/ 1000;
+                url = _subsonicApiHelper
+                    .getStreamUrl(task.baseItem!, format: profile.codec.container, maxBitRate: maxBitRateKbps)
+                    .toString();
+              }
+            case DownloadItemType.image:
+              final coverUrl = _subsonicApiHelper.getCoverArtUrl(task.baseItem!);
+              if (coverUrl == null) {
+                _enqueueLog.severe("No cover art URL for ${task.name}");
+                _isar.writeTxnSync(() {
+                  _downloadsService.updateItemState(task, DownloadItemState.failed);
+                });
+                continue taskLoop;
+              }
+              url = coverUrl.toString();
+            case _:
+              throw StateError("Invalid enqueue ${task.name} which is a ${task.type}");
+          }
           await SchedulerBinding.instance.scheduleTask(() {
             _activeDownloads.add(task.isarId);
             try {
-              // Base URL shouldn't be null at this point (user has to be logged in
-              // to get to the point where they can add downloads).
-              var url = switch (task.type) {
-                DownloadItemType.track =>
-                  _jellyfinApiData
-                      .getTrackDownloadUrl(item: task.baseItem!, transcodingProfile: task.fileTranscodingProfile)
-                      .toString(),
-                DownloadItemType.image =>
-                  _jellyfinApiData
-                      .getImageUrl(
-                        item: task.baseItem!,
-                        // Download original file
-                        quality: null,
-                        format: null,
-                      )
-                      .toString(),
-                _ => throw StateError("Invalid enqueue ${task.name} which is a ${task.type}"),
-              };
               _enqueueLog.fine("Submitting download ${task.name} to background_downloader.");
               var downloadTask = DownloadTask(
                 taskId: task.isarId.toString(),
@@ -357,7 +368,6 @@ class IsarTaskQueue implements TaskQueue {
                 baseDirectory: task.fileDownloadLocation!.baseDirectory.baseDirectory,
                 retries: 3,
                 directory: path_helper.dirname(task.path!),
-                headers: {"Authorization": _finampUserHelper.authorizationHeader},
                 filename: path_helper.basename(task.path!),
               );
               return Future.sync(() async {
@@ -678,7 +688,7 @@ class DownloadsSyncService {
   final _isar = GetIt.instance<Isar>();
   final DownloadsService _downloadsService;
   final _syncLogger = Logger("SyncBuffer");
-  final _jellyfinApiData = GetIt.instance<JellyfinApiHelper>();
+  final _subsonicApiHelper = GetIt.instance<SubsonicApiHelper>();
   final _finampUserHelper = GetIt.instance<FinampUserHelper>();
 
   /// Currently processing syncs.  Will be null if no syncs are executing.
@@ -1222,30 +1232,50 @@ class DownloadsSyncService {
   }
 
   /// Get BaseItemDto from the given collection ID.  Tries local cache, then
-  /// Isar, then requests data from jellyfin in a batch with other calls
-  /// to this method.  Used within [_syncDownload].
+  /// Isar, then requests data from the server.  Used within [_syncDownload].
   Future<DownloadStub?> _getCollectionInfo(BaseItemId id, DownloadItemType type, bool forceServer) async {
     if (_metadataCache.containsKey(id)) {
       return _metadataCache[id];
     }
     Completer<DownloadStub?> itemFetch = Completer();
     try {
-      DownloadStub? item;
-      if (!forceServer) {
-        item = _isar.downloadItems.getSync(DownloadStub.getHash(id.raw, type));
-        if (item != null) {
-          return item;
-        }
+      // Always check Isar first — even with forceServer — to determine subtype.
+      final isarItem = _isar.downloadItems.getSync(DownloadStub.getHash(id.raw, type));
+      if (!forceServer && isarItem != null) {
+        return isarItem;
       }
       _metadataCache[id] = itemFetch.future;
-      item = await _jellyfinApiData
-          .getItemByIdBatched(id, "${_jellyfinApiData.defaultFields},sortName,MediaSources")
-          .then((value) => value == null ? null : DownloadStub.fromItem(item: value, type: type));
+      BaseItemDto? dto;
+      if (type == DownloadItemType.track) {
+        dto = await _subsonicApiHelper.getSongDto(id.raw);
+      } else {
+        // Use subtype from Isar if available; otherwise try album then artist.
+        final subtype = isarItem?.baseItemType ?? BaseItemDtoType.album;
+        try {
+          dto = switch (subtype) {
+            BaseItemDtoType.album => await _subsonicApiHelper.getAlbumDto(id),
+            BaseItemDtoType.artist => (await _subsonicApiHelper.getArtist(id.raw)).$1,
+            BaseItemDtoType.playlist => (await _subsonicApiHelper.getPlaylist(id.raw)).$1,
+            _ => null,
+          };
+        } on SubsonicException catch (e) {
+          if (e.isNotFound && subtype == BaseItemDtoType.album) {
+            // Fall back to artist lookup when type was guessed wrong.
+            try {
+              dto = (await _subsonicApiHelper.getArtist(id.raw)).$1;
+            } catch (_) {
+              dto = null;
+            }
+          } else {
+            rethrow;
+          }
+        }
+      }
+      final item = dto == null ? null : DownloadStub.fromItem(item: dto, type: type);
       _downloadsService.resetConnectionErrors();
       itemFetch.complete(item);
       return itemFetch.future;
     } catch (e) {
-      // Retries should try connecting again instead of re-using error
       unawaited(_metadataCache.remove(id));
       itemFetch.completeError(e);
       _downloadsService.incrementConnectionErrors();
@@ -1258,98 +1288,61 @@ class DownloadsSyncService {
   Map<String, Future<List<String>>> _childCache = {};
 
   /// Get ordered child items for the given collection DownloadStub.  Tries local
-  /// cache, then requests data from jellyfin.  Used within [_syncDownload].
+  /// cache, then requests data from the server.  Used within [_syncDownload].
   Future<List<DownloadStub>> _getCollectionChildren(DownloadStub parent) async {
-    DownloadItemType childType;
-    BaseItemDtoType childFilter;
-    String? fields;
-    String? sortOrder;
     assert(parent.type == DownloadItemType.collection);
     assert(parent.baseItemType.downloadType == DownloadItemType.collection);
-    switch (parent.baseItemType) {
-      case BaseItemDtoType.playlist || BaseItemDtoType.album:
-        childType = DownloadItemType.track;
-        childFilter = BaseItemDtoType.track;
-        fields = "${_jellyfinApiData.defaultFields},MediaSources,SortName";
-        sortOrder = "ParentIndexNumber,IndexNumber,SortName";
-      case BaseItemDtoType.artist || BaseItemDtoType.genre || BaseItemDtoType.library:
-        childType = DownloadItemType.collection;
-        childFilter = BaseItemDtoType.album;
-        fields = "${_jellyfinApiData.defaultFields},SortName";
-      case _:
-        _syncLogger.severe("Unknown collection type ${parent.baseItemType} for ${parent.name}");
-        return Future.value([]);
-    }
-    var item = parent.baseItem!;
+    final item = parent.baseItem!;
 
     if (_childCache.containsKey(item.id.raw)) {
-      var childIds = await _childCache[item.id.raw]!;
+      final childIds = await _childCache[item.id.raw]!;
       return Future.wait(
         childIds.map((e) => _metadataCache[BaseItemId(e)]).nonNulls,
       ).then((value) => value.nonNulls.toList());
     }
-    Completer<List<String>> itemFetch = Completer();
-    // This prevents errors in itemFetch being reported as unhandled.
-    // They are handled by original caller in rethrow.
+    final Completer<List<String>> itemFetch = Completer();
     unawaited(itemFetch.future.then((_) => null, onError: (_) => null));
     try {
       _childCache[item.id.raw] = itemFetch.future;
-      var childItems =
-          await _jellyfinApiData.getItems(
-            parentItem: item,
-            includeItemTypes: childFilter.jellyfinName,
-            sortBy: sortOrder,
-            fields: fields,
-          ) ??
-          [];
+      List<DownloadStub> childStubs;
+      switch (parent.baseItemType) {
+        case BaseItemDtoType.album:
+          final (_, songs) = await _subsonicApiHelper.getAlbum(item.id.raw);
+          childStubs = songs.map((e) => DownloadStub.fromItem(type: DownloadItemType.track, item: e)).toList();
+        case BaseItemDtoType.playlist:
+          final (_, songs) = await _subsonicApiHelper.getPlaylist(item.id.raw);
+          childStubs = songs.map((e) => DownloadStub.fromItem(type: DownloadItemType.track, item: e)).toList();
+        case BaseItemDtoType.artist:
+          final (_, albums) = await _subsonicApiHelper.getArtist(item.id.raw);
+          childStubs = albums.map((e) => DownloadStub.fromItem(type: DownloadItemType.collection, item: e)).toList();
+        case BaseItemDtoType.genre:
+          // Genres don't have a direct children endpoint; use albums by genre.
+          final albums = await _subsonicApiHelper.getAlbumList2(
+            type: 'byGenre',
+            genre: item.name ?? item.id.raw,
+            size: 500,
+          );
+          childStubs = albums.map((e) => DownloadStub.fromItem(type: DownloadItemType.collection, item: e)).toList();
+        case BaseItemDtoType.library:
+          final folderId = int.tryParse(item.id.raw);
+          final albums = await _subsonicApiHelper.getAllAlbums(musicFolderId: folderId);
+          childStubs = albums.map((e) => DownloadStub.fromItem(type: DownloadItemType.collection, item: e)).toList();
+        case _:
+          _syncLogger.severe("Unknown collection type ${parent.baseItemType} for ${parent.name}");
+          itemFetch.complete([]);
+          return [];
+      }
       _downloadsService.resetConnectionErrors();
-      var childStubs = childItems.map((e) => DownloadStub.fromItem(type: childType, item: e)).toList();
-      // If we are a library, we need to get orphan tracks to download in addition to
-      // tracks which are contained in albums.
-      if (parent.baseItemType == BaseItemDtoType.library) {
-        var trackChildItems =
-            await _jellyfinApiData.getItems(
-              parentItem: item,
-              includeItemTypes: BaseItemDtoType.track.jellyfinName,
-              recursive: false,
-              fields: "${_jellyfinApiData.defaultFields},MediaSources,SortName",
-            ) ??
-            [];
-        childItems.addAll(trackChildItems);
-        var trackChildStubs = trackChildItems.map((e) => DownloadStub.fromItem(type: DownloadItemType.track, item: e));
-        childStubs.addAll(trackChildStubs);
-      }
-      // LEGACY - ARTISTS AND GENRES ARE NOW FINAMP COLLECTIONS
-      // If we are an artist, we also need to add the tracks where the artist
-      // only is a performing artist, but not an album artist
-      // We might get some overlap because we often see albumartist = performingartist,
-      // but they will get filtered out later
-      if (parent.baseItemType == BaseItemDtoType.artist) {
-        var artistTrackChildItems =
-            await _jellyfinApiData.getItems(
-              parentItem: item,
-              includeItemTypes: BaseItemDtoType.track.jellyfinName,
-              filters: "Artist=${parent.name}",
-              artistType: ArtistType.artist,
-              fields: "${_jellyfinApiData.defaultFields},MediaSources,SortName",
-            ) ??
-            [];
-        var artistTrackChildStubs = artistTrackChildItems.map(
-          (e) => DownloadStub.fromItem(type: DownloadItemType.track, item: e),
-        );
-        childStubs.addAll(artistTrackChildStubs);
-      }
-      itemFetch.complete(childItems.map((e) => e.id.raw).toList());
-      for (var element in childStubs) {
-        _metadataCache[BaseItemId(element.id)] = Future.value(element);
+      itemFetch.complete(childStubs.map((e) => e.id).toList());
+      for (final stub in childStubs) {
+        _metadataCache[BaseItemId(stub.id)] = Future.value(stub);
       }
       return childStubs;
     } catch (e) {
-      if (e is Response && e.statusCode == 404) {
-        _syncLogger.warning("Got 404 while fetching children of ${parent.name}.");
+      if (e is SubsonicException && e.isNotFound) {
+        _syncLogger.warning("Got not-found while fetching children of ${parent.name}.");
         throw MissingServerItemException(parent);
       } else {
-        // Retries should try connecting again instead of re-using error
         unawaited(_childCache.remove(item.id.raw));
         itemFetch.completeError(e);
         _downloadsService.incrementConnectionErrors();
@@ -1362,101 +1355,52 @@ class DownloadsSyncService {
   /// favorites.  Used within [_syncDownload].
   Future<List<DownloadStub>> _getFinampCollectionChildren(DownloadStub parent) async {
     assert(parent.type == DownloadItemType.finampCollection);
-    FinampCollection collection = parent.finampCollection!;
-    final String fields = "${_jellyfinApiData.defaultFields},MediaSources,SortName";
+    final collection = parent.finampCollection!;
     try {
       List<BaseItemDto> outputItems;
       DownloadItemType? typeOverride;
       switch (collection.type) {
         case FinampCollectionType.favorites:
-          outputItems =
-              await _jellyfinApiData.getItems(
-                includeItemTypes: "Audio,MusicAlbum,Playlist",
-                filters: "IsFavorite",
-                fields: fields,
-              ) ??
-              [];
-          // Artists use a different endpoint, so request those separately
-          outputItems.addAll(
-            await _jellyfinApiData.getItems(includeItemTypes: "MusicArtist", filters: "IsFavorite", fields: fields) ??
-                [],
-          );
+          final starred = await _subsonicApiHelper.getStarred();
+          outputItems = [...starred.artists, ...starred.albums, ...starred.songs];
         case FinampCollectionType.allPlaylists:
         case FinampCollectionType.allPlaylistsMetadata:
-          outputItems = await _jellyfinApiData.getItems(includeItemTypes: "Playlist", fields: fields) ?? [];
+          outputItems = await _subsonicApiHelper.getPlaylists();
         case FinampCollectionType.latest5Albums:
-          outputItems =
-              await _jellyfinApiData.getLatestItems(includeItemTypes: "MusicAlbum", limit: 5, fields: fields) ?? [];
+          outputItems = await _subsonicApiHelper.getAlbumList2(type: 'newest', size: 5);
         case FinampCollectionType.libraryImages:
-          outputItems =
-              await _jellyfinApiData.getItems(
-                parentItem: collection.library!,
-                includeItemTypes: "MusicAlbum",
-                fields: fields,
-              ) ??
-              [];
-          // Playlists need to be fetched without libraries
-          outputItems.addAll(await _jellyfinApiData.getItems(includeItemTypes: "Playlist", fields: fields) ?? []);
-          // Artists use a different endpoint, so request those separately
-          outputItems.addAll(
-            await _jellyfinApiData.getItems(
-                  parentItem: collection.library!,
-                  includeItemTypes: "MusicArtist",
-                  fields: fields,
-                ) ??
-                [],
-          );
-          // Genres use a different endpoint, so request those separately
-          outputItems.addAll(
-            await _jellyfinApiData.getItems(
-                  parentItem: collection.library!,
-                  includeItemTypes: "MusicGenre",
-                  fields: fields,
-                ) ??
-                [],
-          );
+          final folderId = int.tryParse(collection.library?.id.raw ?? '');
+          outputItems = await _subsonicApiHelper.getAllAlbums(musicFolderId: folderId);
+          outputItems.addAll(await _subsonicApiHelper.getPlaylists());
+          outputItems.addAll(await _subsonicApiHelper.getArtists(musicFolderId: folderId));
           outputItems.removeWhere((element) => element.imageId == null);
           typeOverride = DownloadItemType.image;
         case FinampCollectionType.collectionWithLibraryFilter:
-          var item = collection.item!;
-          var baseItemType = BaseItemDtoType.fromItem(collection.item!);
-          outputItems =
-              await _jellyfinApiData.getItems(
-                parentItem: (baseItemType == BaseItemDtoType.genre) ? collection.library! : item,
-                libraryFilter: (baseItemType == BaseItemDtoType.artist) ? collection.library! : null,
-                genreFilter: (baseItemType == BaseItemDtoType.genre) ? item : null,
-                includeItemTypes: BaseItemDtoType.album.jellyfinName,
-                fields: fields,
-              ) ??
-              [];
-          // If we are an artist, we also need to add the tracks where the artist
-          // only is a performing artist, but not an album artist
-          // We might get some overlap because we often see albumartist = performingartist,
-          // but they will get filtered out later
-          if (baseItemType == BaseItemDtoType.artist) {
-            outputItems.addAll(
-              await _jellyfinApiData.getItems(
-                    parentItem: item,
-                    libraryFilter: collection.library!,
-                    includeItemTypes: BaseItemDtoType.track.jellyfinName,
-                    filters: "Artist=${parent.name}",
-                    artistType: ArtistType.artist,
-                    fields: fields,
-                  ) ??
-                  [],
+          final item = collection.item!;
+          final baseItemType = BaseItemDtoType.fromItem(item);
+          if (baseItemType == BaseItemDtoType.genre) {
+            outputItems = await _subsonicApiHelper.getAlbumList2(
+              type: 'byGenre',
+              genre: item.name ?? item.id.raw,
+              size: 500,
             );
+          } else if (baseItemType == BaseItemDtoType.artist) {
+            final (_, albums) = await _subsonicApiHelper.getArtist(item.id.raw);
+            outputItems = albums;
+          } else {
+            outputItems = [];
           }
       }
       _downloadsService.resetConnectionErrors();
-      var stubList = outputItems
+      final stubList = outputItems
           .map((e) => DownloadStub.fromItem(item: e, type: typeOverride ?? e.downloadType))
           .toList();
-      for (var element in stubList) {
-        _metadataCache[BaseItemId(element.id)] = Future.value(element);
+      for (final stub in stubList) {
+        _metadataCache[BaseItemId(stub.id)] = Future.value(stub);
       }
       return stubList;
     } catch (e) {
-      if (e is Response && e.statusCode == 404) {
+      if (e is SubsonicException && e.isNotFound) {
         _syncLogger.warning("Got 404 while fetching children of ${parent.name}.");
         throw MissingServerItemException(parent);
       } else {
@@ -1469,18 +1413,9 @@ class DownloadsSyncService {
   /// Gets the View/Library ID for the given album ID by fetching album children
   /// of all know views.  Used by [_syncDownload] to assign libraries to items
   /// in playlists or finampCollections.
-  Future<BaseItemId?> _getAlbumViewID(BaseItemId albumId) async {
-    final userHelper = GetIt.instance<FinampUserHelper>();
-    for (var view in (userHelper.currentUser?.views.values ?? <BaseItemDto>[])) {
-      var children = await _getCollectionChildren(DownloadStub.fromItem(type: DownloadItemType.collection, item: view));
-      // Iterable.nonNulls does not seem to work here, I don't know why.
-      var childIds = children.map<BaseItemId?>((e) => e.baseItem?.id).where((id) => id != null).toList();
-      if (childIds.contains(albumId)) {
-        return view.id;
-      }
-    }
-    return null;
-  }
+  // Subsonic does not expose which music folder an album belongs to,
+  // so viewId tracking is not available for individual albums/tracks.
+  Future<BaseItemId?> _getAlbumViewID(BaseItemId albumId) async => null;
 
   /// If items on the server are deleted or updated, it is possible that the BaseItemDto stored in the image download is
   /// no longer a valid parent for the image, as identified by blurHash??imageId.  This attempts to select a new parent
@@ -1613,7 +1548,6 @@ class DownloadsSyncService {
     }
     // At this point the baseItem should always have the needed attributes
     List<MediaSourceInfo>? mediaSources = downloadItem.baseItem?.mediaSources;
-    List<MediaStream>? mediaStreams = downloadItem.baseItem?.mediaStreams;
 
     // Container must be accurate because unknown container names break iOS playback
     String? container = downloadItem.syncTranscodingProfile?.codec.container ?? mediaSources?.firstOrNull?.container;
@@ -1624,25 +1558,13 @@ class DownloadsSyncService {
     (subDirectory, baseFilename) = _getTrackDownloadPath(downloadItem);
     String fileName = "$baseFilename$extension";
 
-    // fetch lyrics if track has lyrics
+    // Always attempt to fetch lyrics from Subsonic; returns null if none.
     LyricDto? lyrics;
-    if (mediaStreams?.any((element) => element.type == "Lyric") ?? false) {
-      _syncLogger.finer("Fetching lyrics for ${item.name}");
-      try {
-        lyrics = await _jellyfinApiData.getLyrics(itemId: item.id);
-        _syncLogger.finer("Fetched lyrics for ${item.name}");
-      } catch (e) {
-        _syncLogger.warning("Failed to fetch lyrics for ${item.name}.");
-        //!!! don't fail download if local metadata is outdated and server has no lyrics
-        if (e is Response && e.statusCode == 404) {
-          _syncLogger.finer("No lyrics for ${item.name}");
-        } else {
-          _syncLogger.warning("Failed to fetch lyrics for ${item.name}.");
-          rethrow;
-        }
-      }
-    } else {
-      _syncLogger.finer("No lyrics for ${item.name}");
+    try {
+      lyrics = await _subsonicApiHelper.getLyricsAsDto(item.id.raw);
+      _syncLogger.finer(lyrics != null ? "Fetched lyrics for ${item.name}" : "No lyrics for ${item.name}");
+    } catch (e) {
+      _syncLogger.warning("Failed to fetch lyrics for ${item.name}: $e");
     }
 
     _isar.writeTxnSync(() {

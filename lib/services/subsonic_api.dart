@@ -87,6 +87,12 @@ abstract class SubsonicApi extends ChopperService {
     @Query('id') required String id,
   });
 
+  @FactoryConverter(response: JsonConverter.responseFactory)
+  @GET(path: '/rest/getSong.view')
+  Future<dynamic> getSong({
+    @Query('id') required String id,
+  });
+
   /// [type] options: 'random' | 'newest' | 'highest' | 'frequent' | 'recent' |
   /// 'alphabeticalByName' | 'alphabeticalByArtist' | 'starred' |
   /// 'byYear' | 'byGenre'

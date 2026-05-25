@@ -143,6 +143,23 @@ final class _$SubsonicApi extends SubsonicApi {
   }
 
   @override
+  Future<dynamic> getSong({required String id}) async {
+    final Uri $url = Uri.parse('/rest/getSong.view');
+    final Map<String, dynamic> $params = <String, dynamic>{'id': id};
+    final Request $request = Request(
+      'GET',
+      $url,
+      client.baseUrl,
+      parameters: $params,
+    );
+    final Response $response = await client.send<dynamic, dynamic>(
+      $request,
+      responseConverter: JsonConverter.responseFactory,
+    );
+    return $response.bodyOrThrow;
+  }
+
+  @override
   Future<dynamic> getAlbumList2({
     required String type,
     int? size,
