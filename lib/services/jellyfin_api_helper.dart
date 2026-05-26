@@ -228,6 +228,16 @@ class JellyfinApiHelper {
           final bv = b.sortName ?? b.name ?? '';
           return desc ? bv.compareTo(av) : av.compareTo(bv);
         });
+      case 'PremiereDate' || 'ProductionYear':
+        sorted.sort((a, b) {
+          final ay = a.productionYear ?? 0;
+          final by_ = b.productionYear ?? 0;
+          final cmp = ay.compareTo(by_);
+          if (cmp != 0) return desc ? -cmp : cmp;
+          final av = a.sortName ?? a.name ?? '';
+          final bv = b.sortName ?? b.name ?? '';
+          return desc ? bv.compareTo(av) : av.compareTo(bv);
+        });
       default:
         sorted.sort((a, b) {
           final av = a.sortName ?? a.name ?? '';
