@@ -1,5 +1,7 @@
-import 'package:chopper/chopper.dart';
+import 'dart:convert';
+
 import 'package:get_it/get_it.dart';
+import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
 import '../models/jellyfin_models.dart';
@@ -31,19 +33,23 @@ class SubsonicApiHelper {
   /// Does NOT require credentials — error 10 (missing params) still means a
   /// valid Subsonic server. Returns null if the URL is unreachable or not
   /// a Subsonic server.
+  ///
+  /// Uses a plain HTTP client to avoid Chopper's converter pipeline, which
+  /// has issues parsing responses without credentials.
   Future<SubsonicServerInfo?> probeServer(String url) async {
     final normalised = url.trim().replaceAll(RegExp(r'/+$'), '');
-    _userHelper.serverUrlOverride = normalised;
     try {
-      final response = await _api.ping() as Response;
-      _userHelper.serverUrlOverride = null;
-      if (!response.isSuccessful) return null;
-      final body = response.body as Map<String, dynamic>?;
-      if (body == null || !body.containsKey('subsonic-response')) return null;
-      final inner = body['subsonic-response'] as Map<String, dynamic>;
-      return SubsonicServerInfo.fromInner(inner);
-    } catch (_) {
-      _userHelper.serverUrlOverride = null;
+      final uri = Uri.parse('$normalised/rest/ping.view').replace(
+        queryParameters: {'v': _apiVersion, 'c': _clientName, 'f': 'json'},
+      );
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (!body.containsKey('subsonic-response')) return null;
+      return SubsonicServerInfo.fromInner(
+        body['subsonic-response'] as Map<String, dynamic>,
+      );
+    } catch (e) {
+      _log.warning('probeServer failed for $normalised: $e');
       return null;
     }
   }
@@ -382,17 +388,11 @@ class SubsonicApiHelper {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  /// Unwraps a Chopper [Response] through [SubsonicEnvelope], throwing
-  /// [SubsonicException] on both HTTP and Subsonic-level errors.
-  Map<String, dynamic> _unwrap(dynamic chopperResponse) {
-    final response = chopperResponse as Response;
-    if (!response.isSuccessful) {
-      throw SubsonicException(
-        code: response.statusCode,
-        message: 'HTTP ${response.statusCode}',
-      );
-    }
-    return SubsonicEnvelope.unwrap(response.body as Map<String, dynamic>);
+  /// Unwraps the body returned by a Chopper API call through [SubsonicEnvelope],
+  /// throwing [SubsonicException] on Subsonic-level errors.
+  /// HTTP-level errors are already thrown by Chopper's bodyOrThrow before we get here.
+  Map<String, dynamic> _unwrap(dynamic body) {
+    return SubsonicEnvelope.unwrap(body as Map<String, dynamic>);
   }
 
   /// Builds a fully-authenticated Subsonic URI with auth params appended.

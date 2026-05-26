@@ -160,9 +160,9 @@ class ServerState {
 
     if (info != null) {
       detectedServer = info;
-      baseUrl = urlToTest;
-    } else if (!urlToTest.startsWith("https://")) {
-      // Retry with http if https failed
+      this.baseUrl = urlToTest;
+    } else if (urlToTest.startsWith("https://")) {
+      // HTTPS failed — retry with HTTP
       final httpUrl = urlToTest.replaceFirst("https://", "http://");
       final httpInfo = await subsonicApiHelper.probeServer(httpUrl);
       if (baseUrlToTest != baseUrl) {
@@ -170,7 +170,7 @@ class ServerState {
       }
       if (httpInfo != null) {
         detectedServer = httpInfo;
-        baseUrl = httpUrl;
+        this.baseUrl = httpUrl;
       }
     }
     _log.fine('Server probe result: ${detectedServer?.serverVersion}');
