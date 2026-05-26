@@ -22,6 +22,7 @@ import 'downloads_service_backend.dart';
 import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
 import 'jellyfin_api.dart' as jellyfin_api;
+import 'subsonic_api_helper.dart';
 
 class JellyfinApiHelper {
   final jellyfinApi = jellyfin_api.JellyfinApi.create(true);
@@ -132,20 +133,7 @@ class JellyfinApiHelper {
     /// The maximum number of records to return.
     int? limit,
   }) async {
-    if ((itemIds?.length ?? 0) > 200) {
-      List<BaseItemDto> output = [];
-      // Limit itemIds per request to 200.  Execute up to 10 requests in parallel.
-      for (final slice in itemIds!.slices(2000)) {
-        final futures = slice.slices(200).map((subSlice) => _fetchGetItemsResponse(itemIds: subSlice, fields: fields));
-        final results = await Future.wait(futures);
-        for (var subSliceResult in results) {
-          output.addAll(subSliceResult.items ?? []);
-        }
-      }
-      return output;
-    }
-
-    final response = await _fetchGetItemsResponse(
+    final result = await _subsonicFetch(
       parentItem: parentItem,
       libraryFilter: libraryFilter,
       includeItemTypes: includeItemTypes,
@@ -153,17 +141,14 @@ class JellyfinApiHelper {
       sortOrder: sortOrder,
       searchTerm: searchTerm,
       itemIds: itemIds,
-      albumIds: albumIds,
       filters: filters,
-      fields: fields,
-      recursive: recursive,
       artistType: artistType,
       genreFilter: genreFilter,
       isFavorite: isFavorite,
       startIndex: startIndex,
       limit: limit,
     );
-    return response.items;
+    return result.items;
   }
 
   Future<QueryResult_BaseItemDto> getItemsWithTotalRecordCount({
@@ -184,7 +169,7 @@ class JellyfinApiHelper {
     int? startIndex,
     int? limit,
   }) async {
-    final response = await _fetchGetItemsResponse(
+    return _subsonicFetch(
       parentItem: parentItem,
       libraryFilter: libraryFilter,
       includeItemTypes: includeItemTypes,
@@ -192,17 +177,229 @@ class JellyfinApiHelper {
       sortOrder: sortOrder,
       searchTerm: searchTerm,
       itemIds: itemIds,
-      albumIds: albumIds,
       filters: filters,
-      fields: fields,
-      recursive: recursive,
       artistType: artistType,
       genreFilter: genreFilter,
       isFavorite: isFavorite,
       startIndex: startIndex,
       limit: limit,
     );
-    return response;
+  }
+
+  // ── Subsonic dispatch ─────────────────────────────────────────────────────
+
+  // Extract the Navidrome music folder ID from a CollectionFolder item.
+  int? _subsonicMusicFolderId(BaseItemDto? item) {
+    if (item?.type != 'CollectionFolder') return null;
+    return int.tryParse(item!.id.raw);
+  }
+
+  // Map a Jellyfin sortBy string to a Subsonic getAlbumList2 type.
+  String _subsonicAlbumListType(String? sortBy) {
+    if (sortBy == null) return 'alphabeticalByName';
+    final first = sortBy.split(',').first.trim();
+    return switch (first) {
+      'Random' => 'random',
+      'DateCreated' => 'newest',
+      'PlayCount' => 'frequent',
+      'DatePlayed' => 'recent',
+      'AlbumArtist' => 'alphabeticalByArtist',
+      _ => 'alphabeticalByName',
+    };
+  }
+
+  // Client-side sort of a BaseItemDto list.
+  List<BaseItemDto> _subsonicSort(List<BaseItemDto> items, String? sortBy, String? sortOrder) {
+    if (sortBy == null || sortBy.trim().isEmpty) return items;
+    final first = sortBy.split(',').first.trim();
+    if (first == 'Random') {
+      final shuffled = List<BaseItemDto>.from(items)..shuffle();
+      return shuffled;
+    }
+    final desc = sortOrder?.toLowerCase() == 'descending';
+    final sorted = List<BaseItemDto>.from(items);
+    sorted.sort((a, b) {
+      final av = a.sortName ?? a.name ?? '';
+      final bv = b.sortName ?? b.name ?? '';
+      return desc ? bv.compareTo(av) : av.compareTo(bv);
+    });
+    return sorted;
+  }
+
+  // Extract a page from a list.
+  List<T> _subsonicPaginate<T>(List<T> items, int? startIndex, int? limit) {
+    final start = (startIndex ?? 0).clamp(0, items.length);
+    final end = limit != null ? (start + limit).clamp(start, items.length) : items.length;
+    return items.sublist(start, end);
+  }
+
+  // Central Subsonic dispatch used by getItems / getItemsWithTotalRecordCount.
+  Future<QueryResult_BaseItemDto> _subsonicFetch({
+    BaseItemDto? parentItem,
+    BaseItemDto? libraryFilter,
+    String? includeItemTypes,
+    String? sortBy,
+    String? sortOrder,
+    String? searchTerm,
+    List<BaseItemId>? itemIds,
+    String? filters,
+    ArtistType? artistType,
+    BaseItemDto? genreFilter,
+    bool? isFavorite,
+    int? startIndex,
+    int? limit,
+  }) async {
+    final sub = GetIt.instance<SubsonicApiHelper>();
+    final musicFolderId =
+        _subsonicMusicFolderId(libraryFilter) ?? _subsonicMusicFolderId(parentItem);
+    final isFav = isFavorite == true || filters == 'IsFavorite';
+
+    // 1. Batch item-ID fetch (used by getItemByIdBatched for queue restore).
+    if (itemIds != null) {
+      if (itemIds.isEmpty) {
+        return QueryResult_BaseItemDto(items: [], totalRecordCount: 0, startIndex: 0);
+      }
+      final results = await Future.wait(itemIds.map((id) => sub.getSongDto(id.raw)));
+      final items = results.nonNulls.toList();
+      return QueryResult_BaseItemDto(items: items, totalRecordCount: items.length, startIndex: 0);
+    }
+
+    // 2. Full-text search.
+    final trimmed = searchTerm?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) {
+      final r = await sub.search3(trimmed);
+      final items = switch (includeItemTypes) {
+        'MusicArtist' => r.artists,
+        'MusicAlbum' => r.albums,
+        'Audio' => r.songs,
+        _ => [...r.artists, ...r.albums, ...r.songs],
+      };
+      return QueryResult_BaseItemDto(items: items, totalRecordCount: items.length, startIndex: 0);
+    }
+
+    // 3. Playlist children.
+    if (parentItem?.type == 'Playlist') {
+      final (_, songs) = await sub.getPlaylist(parentItem!.id.raw);
+      return QueryResult_BaseItemDto(items: songs, totalRecordCount: songs.length, startIndex: 0);
+    }
+
+    // 4. Artist children (albums or tracks).
+    if (parentItem?.type == 'MusicArtist') {
+      final (_, albums) = await sub.getArtist(parentItem!.id.raw);
+      if (includeItemTypes == 'MusicAlbum') {
+        var filtered = genreFilter != null
+            ? albums.where((a) => a.genres?.contains(genreFilter.name) ?? false).toList()
+            : albums;
+        if (isFav) filtered = filtered.where((a) => a.userData?.isFavorite == true).toList();
+        final sorted = _subsonicSort(filtered, sortBy, sortOrder);
+        return QueryResult_BaseItemDto(items: sorted, totalRecordCount: sorted.length, startIndex: 0);
+      } else if (includeItemTypes == 'Audio') {
+        // Expand each album to get its tracks.
+        final trackLists = await Future.wait(albums.map((a) => sub.getAlbum(a.id.raw).then((r) => r.$2)));
+        var songs = trackLists.expand((l) => l).toList();
+        if (genreFilter != null) {
+          songs = songs.where((s) => s.genres?.contains(genreFilter.name) ?? false).toList();
+        }
+        if (isFav) songs = songs.where((s) => s.userData?.isFavorite == true).toList();
+        final sorted = _subsonicSort(songs, sortBy, sortOrder);
+        final page = _subsonicPaginate(sorted, startIndex, limit);
+        return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
+      }
+    }
+
+    // 5. Album children (tracks).
+    if (parentItem?.type == 'MusicAlbum') {
+      final (_, songs) = await sub.getAlbum(parentItem!.id.raw);
+      final sorted = _subsonicSort(songs, sortBy, sortOrder);
+      return QueryResult_BaseItemDto(items: sorted, totalRecordCount: sorted.length, startIndex: 0);
+    }
+
+    // 6. Genre-filtered browse.
+    if (genreFilter != null) {
+      switch (includeItemTypes) {
+        case 'MusicAlbum':
+          final albums = await sub.getAlbumList2(
+            type: 'byGenre',
+            size: limit ?? 5,
+            offset: startIndex,
+            genre: genreFilter.name,
+            musicFolderId: musicFolderId,
+          );
+          final filtered = isFav ? albums.where((a) => a.userData?.isFavorite == true).toList() : albums;
+          return QueryResult_BaseItemDto(
+            items: filtered,
+            totalRecordCount: genreFilter.albumCount ?? filtered.length,
+            startIndex: startIndex ?? 0,
+          );
+        case 'Audio':
+          final songs = await sub.getSongsByGenre(
+            genreFilter.name!,
+            count: limit,
+            offset: startIndex,
+            musicFolderId: musicFolderId,
+          );
+          final filtered = isFav ? songs.where((s) => s.userData?.isFavorite == true).toList() : songs;
+          return QueryResult_BaseItemDto(
+            items: filtered,
+            totalRecordCount: genreFilter.songCount ?? filtered.length,
+            startIndex: startIndex ?? 0,
+          );
+        default:
+          return QueryResult_BaseItemDto(items: [], totalRecordCount: 0, startIndex: 0);
+      }
+    }
+
+    // 7. Favorites.
+    if (isFav) {
+      final starred = await sub.getStarred(musicFolderId: musicFolderId);
+      final items = switch (includeItemTypes) {
+        'MusicArtist' => starred.artists,
+        'MusicAlbum' => starred.albums,
+        'Audio' => starred.songs,
+        _ => [...starred.artists, ...starred.albums, ...starred.songs],
+      };
+      final sorted = _subsonicSort(items, sortBy, sortOrder);
+      final page = _subsonicPaginate(sorted, startIndex, limit);
+      return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
+    }
+
+    // 8. Top-level browse by item type.
+    switch (includeItemTypes) {
+      case 'MusicArtist':
+        final all = await sub.getArtists(musicFolderId: musicFolderId);
+        final sorted = _subsonicSort(all, sortBy, sortOrder);
+        final page = _subsonicPaginate(sorted, startIndex, limit);
+        return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
+
+      case 'MusicAlbum':
+        final type = _subsonicAlbumListType(sortBy);
+        // Random album lists can't be meaningfully paginated; always use offset 0.
+        final albums = await sub.getAlbumList2(
+          type: type,
+          size: limit ?? 100,
+          offset: type == 'random' ? 0 : startIndex,
+          musicFolderId: musicFolderId,
+        );
+        return QueryResult_BaseItemDto(items: albums, totalRecordCount: albums.length, startIndex: startIndex ?? 0);
+
+      case 'Audio':
+        final songs = await sub.getRandomSongs(size: limit ?? 100, musicFolderId: musicFolderId);
+        return QueryResult_BaseItemDto(items: songs, totalRecordCount: songs.length, startIndex: 0);
+
+      case 'MusicGenre':
+        final all = await sub.getGenres();
+        final sorted = _subsonicSort(all, sortBy, sortOrder);
+        final page = _subsonicPaginate(sorted, startIndex, limit);
+        return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
+
+      case 'Playlist':
+        final all = await sub.getPlaylists();
+        return QueryResult_BaseItemDto(items: all, totalRecordCount: all.length, startIndex: 0);
+
+      default:
+        _jellyfinApiHelperLogger.warning('_subsonicFetch: unhandled includeItemTypes=$includeItemTypes');
+        return QueryResult_BaseItemDto(items: [], totalRecordCount: 0, startIndex: 0);
+    }
   }
 
   Future<QueryResult_BaseItemDto> _fetchGetItemsResponse({
@@ -714,10 +911,13 @@ class JellyfinApiHelper {
 
   /// Gets an item from a user's library.
   Future<BaseItemDto> getItemById(BaseItemId itemId) async {
-    assert(_verifyCallable());
-    final response = await jellyfinApi.getItemById(userId: _finampUserHelper.currentUser!.id, itemId: itemId);
-
-    return (BaseItemDto.fromJson(response as Map<String, dynamic>));
+    final sub = GetIt.instance<SubsonicApiHelper>();
+    // Try song first, then album.
+    final song = await sub.getSongDto(itemId.raw);
+    if (song != null) return song;
+    final album = await sub.getAlbumDto(itemId);
+    if (album != null) return album;
+    throw Exception('Item not found in Subsonic: ${itemId.raw}');
   }
 
   /// Gets the user's permission for a specific playlist.
@@ -844,11 +1044,10 @@ class JellyfinApiHelper {
     }
   }
 
-  /// Marks an item as a favorite.
+  /// Marks an item as a favorite via Subsonic star.
   Future<UserItemDataDto> addFavorite(BaseItemId itemId) async {
-    assert(_verifyCallable());
-    final response = await jellyfinApi.addFavorite(userId: _finampUserHelper.currentUser!.id, itemId: itemId);
-
+    final sub = GetIt.instance<SubsonicApiHelper>();
+    await sub.star(id: itemId.raw);
     final downloadsService = GetIt.instance<DownloadsService>();
     unawaited(
       downloadsService.resync(
@@ -857,14 +1056,13 @@ class JellyfinApiHelper {
         keepSlow: true,
       ),
     );
-    return UserItemDataDto.fromJson(response as Map<String, dynamic>);
+    return UserItemDataDto(isFavorite: true, played: false, playCount: 0, playbackPositionTicks: 0);
   }
 
-  /// Unmarks item as a favorite.
+  /// Unmarks item as a favorite via Subsonic unstar.
   Future<UserItemDataDto> removeFavorite(BaseItemId itemId) async {
-    assert(_verifyCallable());
-    final response = await jellyfinApi.removeFavorite(userId: _finampUserHelper.currentUser!.id, itemId: itemId);
-
+    final sub = GetIt.instance<SubsonicApiHelper>();
+    await sub.unstar(id: itemId.raw);
     final downloadsService = GetIt.instance<DownloadsService>();
     unawaited(
       downloadsService.resync(
@@ -873,7 +1071,7 @@ class JellyfinApiHelper {
         keepSlow: true,
       ),
     );
-    return UserItemDataDto.fromJson(response as Map<String, dynamic>);
+    return UserItemDataDto(isFavorite: false, played: false, playCount: 0, playbackPositionTicks: 0);
   }
 
   void addArtistToMixBuilderList(BaseItemDto item) {

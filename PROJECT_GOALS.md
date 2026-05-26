@@ -232,7 +232,7 @@ Functionally equivalent: `getPlaylists`, `getPlaylist(id)`, `createPlaylist`, `u
 - [x] `LoginServerSelectionPage` now shows `NavidromeServerWidget` on successful probe
 - [x] `LoginAuthenticationPage` authenticates via Subsonic ping; no Jellyfin updateCapabilities
 
-### Phase 5 — Wiring & Cleanup ✅ Complete
+### Phase 5 — Wiring & Cleanup 🚧 In Progress
 Wire the new Subsonic services into the live app so playback and browsing actually work:
 - [x] **Password security** — `flutter_secure_storage` replaces plaintext `subsonicPassword`; Android Keystore on Android, libsecret/Secret Service on Linux; migration from old plaintext storage on first run
 - [x] `album_image_provider.dart` — routed cover art through `SubsonicApiHelper.getCoverArtUrl()`
@@ -242,6 +242,15 @@ Wire the new Subsonic services into the live app so playback and browsing actual
 - [x] `music_player_background_task.dart` — `_trackUri()` replaced: direct play → `getStreamUrl(item)` (original file); transcode → `getStreamUrl(item, format: subsonicFormat, maxBitRate: kbps)`; `FinampTranscodingStreamingFormat.codec` maps directly to Subsonic format names (vorbis → "ogg")
 - [x] `downloads_service_backend.dart` — `IsarTaskQueue` now uses `SubsonicApiHelper.getDownloadUrl()` / `getStreamUrl()` / `getCoverArtUrl()` for all download URL construction; Subsonic auth is in query params so no `Authorization` header is set; `DownloadsSyncService._getCollectionInfo/Children/_getFinampCollectionChildren` fully rewritten to use Subsonic endpoints dispatched by item type; lyrics fetched unconditionally via `getLyricsAsDto()` (no Jellyfin MediaStream check needed)
 - [x] `downloads_service.dart` — repair step 4 lyrics fetch replaced with `SubsonicApiHelper.getLyricsAsDto()`; `getSong` endpoint added to `subsonic_api.dart` for per-song metadata fetches; `toJson()` instance methods added to all `@JsonSerializable` Subsonic model classes (required by `explicitToJson: true` on parent classes)
+- [ ] **Music browsing layer** — replace `JellyfinApiHelper.getItems()` calls in `music_screen_tab_view.dart` and provider files with `SubsonicApiHelper` equivalents:
+  - [ ] `music_screen_tab_view.dart` — paginated artist/album/song/genre/playlist listing
+  - [ ] `album_screen_provider.dart` — songs within an album
+  - [ ] `artist_content_provider.dart` — albums and tracks for an artist
+  - [ ] `genre_screen_provider.dart` — items within a genre
+  - [ ] `item_amount_provider.dart` — item counts for UI
+  - [ ] `favorite_provider.dart` — star/unstar and starred item listing
+- [ ] **Playlist screens** — replace Jellyfin calls in `playlist_edit_screen.dart`, `AddToPlaylistScreen/`
+- [ ] **Player chips** — `artist_chip.dart`, `album_chip.dart`, `genre_chip.dart` still look up items via Jellyfin
 
 ### Phase 6 — Branding
 - [ ] App name: `finamp` → `naviamp` in `pubspec.yaml`
@@ -264,5 +273,5 @@ To pull UI improvements from upstream Finamp:
 - **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. `JellyfinApiHelper` is retained only for its `runInIsolate()` utility used in `downloads_service.dart`. Both files should be pruned / replaced in Phase 6.
 - **`FinampUser` Jellyfin fields** (`accessToken`, `serverId`, `views`) are still in the model. For Subsonic logins they are set to empty strings / empty maps. They will be cleaned up in Phase 6.
 - **`FinampUser.subsonicPassword`** field still exists in the model for migration reading (detects and migrates plaintext passwords from old installs to secure storage on first run). It is no longer written by new code. Can be removed in Phase 6 after migration window.
-- **Music browsing layer** (`music_screen_tab_view.dart` and associated Riverpod providers) still calls Jellyfin-backed providers for artist/album/song listing. This is the main remaining functionality gap — the app can log in, play, and download, but browsing the library is not yet wired to Subsonic.
+- **Music browsing layer** (`music_screen_tab_view.dart` and associated Riverpod providers) still calls Jellyfin-backed providers for artist/album/song listing. This is the main remaining functionality gap — tracked in Phase 5 remaining items.
 - **`probeServer` bypasses Chopper** (`subsonic_api_helper.dart:probeServer`) — uses a raw `http.get()` call instead of going through the `SubsonicApi` Chopper client. The root cause is that Chopper's `JsonConverter.responseFactory` pipeline doesn't correctly return the parsed `Map` body when called without credentials (the response is received and logged, but `bodyOrThrow` produces a value that fails the `as Map` cast). All other authenticated API calls go through `_unwrap()` correctly. The probe should eventually be moved back to using Chopper once the converter issue is diagnosed and fixed.
