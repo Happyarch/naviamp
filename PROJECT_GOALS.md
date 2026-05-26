@@ -249,6 +249,11 @@ Wire the new Subsonic services into the live app so playback and browsing actual
 - [x] **`PlayOnService` silenced** — returns early in `startListener()` when Subsonic credentials are present; eliminates 405 spam to Navidrome's non-Jellyfin endpoints
 - [x] **`getItemById` artist fallback** — tries song → album → artist in sequence; fixes `artistItemProvider` in `artist_chip.dart` which calls `getItemById(artistId)` on render
 - [x] **Log level** — `getSongDto`/`getAlbumDto` demote `SubsonicException(70)` from WARNING to FINE; reduces noise from expected fallback misses
+- [x] **`trackCount` fix** — replaced `~/ 16` formula with `_countIds()` that walks 4-byte length-prefix format; fixes `_unpackIntList` assertion crash on queue restore
+- [x] **Playlist tab null check** — `_playlistToDto` was missing `childCount`; `generateSubtitle` uses `item.childCount!` for playlists; fixed by adding `childCount: playlist.songCount`
+- [x] **Offline album screen null check** — `_albumToDto` was missing `childCount`; `item_info.dart` uses `item.childCount!` in offline mode; fixed by adding `childCount: album.songCount`
+- [x] **`serverMissingBlurhash` warning suppressed** — `downloads_service.dart` now checks Subsonic credentials before setting the flag; Navidrome never provides blurhashes so the "Jellyfin server misconfigured" warning was always appearing falsely
+- [x] **ThemeProvider image error level** — `_fetchImage` onError demoted from SEVERE to WARNING; empty cached image files (e.g. disc-level cover art not found) are handled gracefully and don't warrant SEVERE
 - [ ] **Playlist screens** — `playlist_edit_screen.dart`, `AddToPlaylistScreen/` still call Jellyfin for playlist create/edit/delete
 - [ ] **`network_settings_screen.dart`** — still pings Jellyfin server URL (non-functional)
 

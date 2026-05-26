@@ -546,6 +546,7 @@ class SubsonicApiHelper {
             (album.genre != null ? [album.genre!] : null),
         runTimeTicks: album.duration * _secondsToTicks,
         songCount: album.songCount,
+        childCount: album.songCount,
         imageTags: album.coverArt != null ? {'Primary': album.coverArt!} : null,
         userData: UserItemDataDto(
           isFavorite: album.starred != null,
@@ -562,6 +563,7 @@ class SubsonicApiHelper {
         overview: playlist.comment,
         runTimeTicks: playlist.duration * _secondsToTicks,
         songCount: playlist.songCount,
+        childCount: playlist.songCount,
         imageTags: playlist.coverArt != null ? {'Primary': playlist.coverArt!} : null,
         userData: UserItemDataDto(
           isFavorite: false,

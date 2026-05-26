@@ -237,7 +237,7 @@ class FinampThemeFromImage extends _$FinampThemeFromImage {
       onError: (e, stack) {
         stream.removeListener(listener!);
         completer.complete(null);
-        themeProviderLogger.severe(e, e, stack);
+        themeProviderLogger.warning(e);
       },
     );
 

@@ -159,9 +159,19 @@ Parent classes that override: use `@override`. This is required because parent c
 
 Navidrome sends some OpenSubsonic extension fields with unexpected JSON types. Use `@JsonKey(includeFromJson: false, includeToJson: false)` to ignore fields where the Navidrome type doesn't match the Dart type and the field isn't used in `BaseItemDto` mapping. Current examples in `SubsonicAlbumID3`: `originalReleaseDate`, `releaseDate`, `releaseTypes`.
 
+### `childCount` must mirror `songCount` in DTO mappers
+
+Several UI components (e.g. `generate_subtitle.dart` for playlists, `item_info.dart` for offline album track counts) use `item.childCount!` and will crash if it is null. Always set `childCount: <songCount>` alongside `songCount` in `_albumToDto` and `_playlistToDto`.
+
 ### Queue persistence
 
 `FinampStorableQueueInfo.packIds` / `_unpackIds` use a **4-byte length-prefix + UTF-8** format (not the old 16-byte hex UUID format). Any Navidrome alphanumeric ID is stored correctly. Old hex-format queues saved before this change decode as empty lists.
+
+`FinampStorableQueueInfo.trackCount` uses `_countIds()` (a length-prefix walker) — never `~/ 16` (old hex assumption). `_unpackIntList` uses `trackCount` to size its bit-buffer read; a wrong count causes an assertion crash.
+
+### `serverMissingBlurhash` is suppressed for Navidrome
+
+`downloads_service.dart` now guards the `serverMissingBlurhash = true` assignment with a check for Subsonic credentials. Without this guard the downloads tab always shows "Jellyfin server misconfigured" because Navidrome never provides blurhashes.
 
 ---
 

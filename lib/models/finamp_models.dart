@@ -3947,8 +3947,23 @@ class FinampStorableQueueInfo extends FinampStorableQueueInfoLegacy {
   List<int>? get shuffleOrder =>
       packedShuffleOrder == null ? null : _unpackIntList(packedShuffleOrder!, max(0, trackCount - 1)).toList();
 
+  static int _countIds(Uint8List data) {
+    int count = 0, i = 0;
+    while (i + 4 <= data.length) {
+      final len = (data[i] << 24) | (data[i + 1] << 16) | (data[i + 2] << 8) | data[i + 3];
+      i += 4;
+      if (i + len > data.length) break;
+      count++;
+      i += len;
+    }
+    return count;
+  }
+
   int get trackCount =>
-      (packedPreviousTracks.length + packedCurrentTrack.length + packedNextUp.length + packedQueue.length) ~/ 16;
+      _countIds(packedPreviousTracks) +
+      _countIds(packedCurrentTrack) +
+      _countIds(packedNextUp) +
+      _countIds(packedQueue);
 
   /// Source indexes in trackSourceIndexes are stored as n bit unsigned ints packed
   /// into a Uint8List, where n is the smallest number that can index into all entries

@@ -9,6 +9,7 @@ import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
 import 'package:finamp/services/subsonic_api_helper.dart';
+import 'package:finamp/services/subsonic_user_helper.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1584,7 +1585,9 @@ class DownloadsService {
     if (imageId == null) {
       return null;
     }
-    if (item != null && item.blurHash == null) {
+    // Navidrome never provides blurhashes — suppress the warning for Subsonic backends.
+    if (item != null && item.blurHash == null &&
+        !GetIt.instance<SubsonicUserHelper>().hasCredentials) {
       serverMissingBlurhash = true;
     }
     return _getDownloadByID(imageId, DownloadItemType.image);
