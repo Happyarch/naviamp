@@ -179,7 +179,7 @@ adb shell monkey -p com.unicornsonlsd.finamp.debug -c android.intent.category.LA
 adb logcat --pid=$(adb shell pidof -s com.unicornsonlsd.finamp.debug) | grep -E "WARNING|SEVERE|ERROR"
 ```
 
-The device runs the app over Tailscale to a local Navidrome instance (HTTP, not HTTPS). Cleartext HTTP is already enabled in `android/app/src/main/AndroidManifest.xml` and `network_security_config.xml`.
+Cleartext HTTP is intentionally enabled in `android/app/src/main/AndroidManifest.xml` and `network_security_config.xml`. Many users run Navidrome on a local network or tunnel through a trusted VPN (Tailscale, ZeroTier) where transport encryption is handled at the network layer. HTTPS is recommended for open WAN deployments but is the user's responsibility — the app accepts whatever URL the user types and does not enforce a scheme.
 
 ---
 
