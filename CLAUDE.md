@@ -128,8 +128,6 @@ Tries in order: `getSongDto` → `getAlbumDto` → `getArtist`. All three are wr
 
 ### Remaining Jellyfin remnants
 
-- `lib/screens/playlist_edit_screen.dart` — playlist editing still via Jellyfin
-- `lib/components/AddToPlaylistScreen/` — playlist creation/listing still via Jellyfin
 - `lib/screens/network_settings_screen.dart` — pings Jellyfin server URL (non-functional / harmless)
 - `lib/services/PlayOnService` — silenced for Navidrome (returns early when Subsonic credentials are present), but the Jellyfin WebSocket code is still there
 
@@ -176,6 +174,15 @@ Several UI components (e.g. `generate_subtitle.dart` for playlists, `item_info.d
 1. **Format check** (`_isExpectedAudioMime`): compares `event.mimeType` from the HTTP response against the expected MIME type for the requested codec (`ogg`→`audio/ogg`, `aac`→`audio/aac`/`audio/mp4`, `mp3`→`audio/mpeg`). If Navidrome has no FFmpeg profile for the requested format, it falls back to serving the original file — wrong extension, wrong codec, possibly unplayable. Mismatch triggers a WARNING log and a snackbar.
 
 2. **Bitrate correction**: estimates actual bitrate as `(fileSizeBytes * 8) / durationSecs`. If >20% below the requested `stereoBitrate` (server capped it silently), updates `fileTranscodingProfile.stereoBitrate` so the downloads UI shows the real bitrate rather than the requested one.
+
+### Playlist mutation via Subsonic
+
+Subsonic playlist mutation is index-based (remove by 0-based position) rather than entry-ID-based (Jellyfin). The bridge:
+
+- `SubsonicApiHelper.getPlaylist()` stores each song's 0-based position as `playlistItemId` (e.g., `"0"`, `"1"`, `"2"`). The UI reads this field when it needs to remove a specific song.
+- `JellyfinApiHelper.removeItemsFromPlaylist()` parses those strings back to `int` and calls `SubsonicApiHelper.updatePlaylist(songIndexesToRemove: [...])`.
+- `JellyfinApiHelper.updatePlaylist()` with `newPlaylist.ids != null` calls `SubsonicApiHelper.replacePlaylistTracks()`, which uses `createPlaylist(playlistId: id, songId: [...])` to atomically replace the track list; empty list falls back to index-based removal of all songs.
+- `JellyfinApiHelper.addItemstoPlaylist()` expands non-song IDs (album, artist, playlist, genre) to song IDs before calling `updatePlaylist(songIdToAdd)`.
 
 ### `serverMissingBlurhash` is suppressed for Navidrome
 

@@ -283,17 +283,52 @@ class SubsonicApiHelper {
   }
 
   /// Returns (playlist metadata, songs).
+  /// Songs have `playlistItemId` set to their 0-based index within the
+  /// playlist — used by callers that need to remove items by index.
   Future<(BaseItemDto, List<BaseItemDto>)> getPlaylist(String id) async {
     final inner = _unwrap(await _api.getPlaylist(id: id));
     final playlist = SubsonicPlaylistWithSongs.fromJson(inner['playlist'] as Map<String, dynamic>);
-    return (
-      _playlistToDto(playlist),
-      (playlist.entry ?? <SubsonicChild>[]).map(_childToDto).toList(),
-    );
+    final entries = playlist.entry ?? <SubsonicChild>[];
+    final songs = entries.asMap().entries.map((e) {
+      final dto = _childToDto(e.value);
+      dto.playlistItemId = e.key.toString();
+      return dto;
+    }).toList();
+    return (_playlistToDto(playlist), songs);
+  }
+
+  /// Returns the `public` visibility flag for a playlist, or null if unknown.
+  Future<bool?> getPlaylistPublic(String id) async {
+    final inner = _unwrap(await _api.getPlaylist(id: id));
+    final playlist = SubsonicPlaylistWithSongs.fromJson(inner['playlist'] as Map<String, dynamic>);
+    return playlist.public;
   }
 
   Future<void> createPlaylist({String? name, List<String>? songIds}) async {
     _unwrap(await _api.createPlaylist(name: name, songId: songIds));
+  }
+
+  /// Creates a playlist and returns its server-assigned ID.
+  Future<String> createPlaylistGetId({String? name, List<String>? songIds}) async {
+    final inner = _unwrap(await _api.createPlaylist(name: name, songId: songIds));
+    final playlist = SubsonicPlaylist.fromJson(inner['playlist'] as Map<String, dynamic>);
+    return playlist.id;
+  }
+
+  /// Replaces the entire song list of an existing playlist.
+  /// If [songIds] is empty, removes all songs via index-based removal.
+  Future<void> replacePlaylistTracks(String id, List<String> songIds) async {
+    if (songIds.isEmpty) {
+      final (_, currentSongs) = await getPlaylist(id);
+      if (currentSongs.isNotEmpty) {
+        await updatePlaylist(
+          id: id,
+          songIndexesToRemove: List.generate(currentSongs.length, (i) => i),
+        );
+      }
+    } else {
+      _unwrap(await _api.createPlaylist(playlistId: id, songId: songIds));
+    }
   }
 
   Future<void> updatePlaylist({

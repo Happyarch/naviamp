@@ -953,6 +953,10 @@ class JellyfinApiHelper {
       final (artist, _) = await sub.getArtist(itemId.raw);
       return artist;
     } catch (_) {}
+    try {
+      final (playlist, _) = await sub.getPlaylist(itemId.raw);
+      return playlist;
+    } catch (_) {}
     throw Exception('Item not found in Subsonic: ${itemId.raw}');
   }
 
@@ -1001,6 +1005,10 @@ class JellyfinApiHelper {
   /// Gets a Playlist
   Future<PlaylistInfo> getPlaylist(BaseItemId playlistId) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      final public = await GetIt.instance<SubsonicApiHelper>().getPlaylistPublic(playlistId.raw);
+      return PlaylistInfo(openAccess: public);
+    }
     final response = await jellyfinApi.getPlaylist(playlistId: playlistId);
     return PlaylistInfo.fromJson(response as Map<String, dynamic>);
   }
@@ -1008,12 +1016,17 @@ class JellyfinApiHelper {
   /// Creates a new playlist.
   Future<NewPlaylistResponse> createNewPlaylist(NewPlaylist newPlaylist) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      final sub = GetIt.instance<SubsonicApiHelper>();
+      final songIds = newPlaylist.ids?.map((id) => id.raw).toList() ?? [];
+      final newId = await sub.createPlaylistGetId(name: newPlaylist.name, songIds: songIds);
+      return NewPlaylistResponse(id: BaseItemId(newId));
+    }
     final response = await jellyfinApi.createNewPlaylist(newPlaylist: newPlaylist);
-
     return NewPlaylistResponse.fromJson(response as Map<String, dynamic>);
   }
 
-  /// Adds items to a playlist.
+  /// Adds items to a playlist, expanding non-track IDs to their constituent songs.
   Future<void> addItemstoPlaylist({
     /// The playlist id.
     required BaseItemId playlistId,
@@ -1022,10 +1035,50 @@ class JellyfinApiHelper {
     List<BaseItemId>? ids,
   }) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials && ids != null) {
+      final sub = GetIt.instance<SubsonicApiHelper>();
+      final songIds = <String>[];
+      for (final id in ids) {
+        final song = await sub.getSongDto(id.raw);
+        if (song != null) { songIds.add(id.raw); continue; }
+        bool handled = false;
+        try {
+          final (_, songs) = await sub.getAlbum(id.raw);
+          songIds.addAll(songs.map((s) => s.id.raw));
+          handled = true;
+        } catch (_) {}
+        if (handled) continue;
+        try {
+          final (_, albums) = await sub.getArtist(id.raw);
+          for (final album in albums) {
+            final (_, songs) = await sub.getAlbum(album.id.raw);
+            songIds.addAll(songs.map((s) => s.id.raw));
+          }
+          handled = true;
+        } catch (_) {}
+        if (handled) continue;
+        try {
+          final (_, songs) = await sub.getPlaylist(id.raw);
+          songIds.addAll(songs.map((s) => s.id.raw));
+          handled = true;
+        } catch (_) {}
+        if (handled) continue;
+        // Treat as genre (Subsonic genres use name as ID)
+        try {
+          final songs = await sub.getSongsByGenre(id.raw);
+          songIds.addAll(songs.map((s) => s.id.raw));
+        } catch (_) {}
+      }
+      if (songIds.isNotEmpty) {
+        await sub.updatePlaylist(id: playlistId.raw, songIdsToAdd: songIds);
+      }
+      return;
+    }
     await jellyfinApi.addItemsToPlaylist(playlistId: playlistId, ids: ids?.join(","));
   }
 
   /// Remove items from a playlist.
+  /// For Navidrome: [entryIds] are 0-based index strings set on items by getPlaylist().
   Future<void> removeItemsFromPlaylist({
     /// The playlist id.
     required BaseItemId playlistId,
@@ -1034,6 +1087,16 @@ class JellyfinApiHelper {
     List<String>? entryIds,
   }) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials && entryIds != null) {
+      final indices = entryIds.map((e) => int.tryParse(e)).whereType<int>().toList();
+      if (indices.isNotEmpty) {
+        await GetIt.instance<SubsonicApiHelper>().updatePlaylist(
+          id: playlistId.raw,
+          songIndexesToRemove: indices,
+        );
+      }
+      return;
+    }
     final response = await jellyfinApi.removeItemsFromPlaylist(playlistId: playlistId, entryIds: entryIds?.join(","));
     if (response.statusCode == 403) {
       _jellyfinApiHelperLogger.warning(
@@ -1074,6 +1137,24 @@ class JellyfinApiHelper {
     required NewPlaylist newPlaylist,
   }) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      final sub = GetIt.instance<SubsonicApiHelper>();
+      if (newPlaylist.ids != null) {
+        // Track-list replacement: use createPlaylist to overwrite the song list.
+        await sub.replacePlaylistTracks(
+          itemId.raw,
+          newPlaylist.ids!.map((id) => id.raw).toList(),
+        );
+      } else {
+        // Metadata-only update: name and/or public visibility.
+        await sub.updatePlaylist(
+          id: itemId.raw,
+          name: newPlaylist.name,
+          public: newPlaylist.isPublic,
+        );
+      }
+      return;
+    }
     final response = await jellyfinApi.updatePlaylist(playlistId: itemId, playlist: newPlaylist);
     if (response.toString().isNotEmpty) {
       throw response as Object;
