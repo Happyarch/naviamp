@@ -1,11 +1,11 @@
-dnl Desktop file entry for Finamp on Linux. Use m4 to generate the final file.
+dnl Desktop file entry for Naviamp on Linux. Use m4 to generate the final file.
 [Desktop Entry]
 Type=Application
-Name=Finamp
+Name=Naviamp
 GenericName=Music Player
-Icon=finamp
-Exec=__INSTALL_PATH__/finamp
+Icon=naviamp
+Exec=__INSTALL_PATH__/naviamp
 Terminal=false
 Categories=AudioVideo;Audio;Player;Music;
-Comment=An open source Jellyfin music player
-MimeType=x-scheme-handler/finamp;
+Comment=An open source Navidrome music player
+MimeType=x-scheme-handler/naviamp;

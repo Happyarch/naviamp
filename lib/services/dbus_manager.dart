@@ -32,11 +32,11 @@ Future<DBusMethodResponse> _setAccentColor(String text) async {
 }
 
 class _DBusEndpoints extends DBusObject {
-  _DBusEndpoints() : super(DBusObjectPath('/com/unicornsonlsd/Finamp'));
+  _DBusEndpoints() : super(DBusObjectPath('/com/naviamp/Naviamp'));
 
   @override
   Future<DBusMethodResponse> handleMethodCall(DBusMethodCall call) async {
-    if (call.interface != 'com.unicornsonlsd.Finamp') return DBusMethodErrorResponse.unknownInterface();
+    if (call.interface != 'com.naviamp.Naviamp') return DBusMethodErrorResponse.unknownInterface();
 
     switch (call.name) {
       case "updateAccentColor":
@@ -57,7 +57,7 @@ Future<void> initDBus() async {
   final client = DBusClient.session();
 
   try {
-    await client.requestName('com.unicornsonlsd.FinampSettings');
+    await client.requestName('com.naviamp.NaviampSettings');
     await client.registerObject(_DBusEndpoints());
   } catch (e) {
     _logger.warning("Failed to register object: $e");

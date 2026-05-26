@@ -131,11 +131,12 @@ Tries in order: `getSongDto` → `getAlbumDto` → `getArtist`. All three are wr
 - `lib/screens/network_settings_screen.dart` — pings Jellyfin server URL (non-functional / harmless)
 - `lib/services/PlayOnService` — silenced for Navidrome (returns early when Subsonic credentials are present), but the Jellyfin WebSocket code is still there
 
-### Phase 6 branding (not started)
+### Phase 6 branding (code renames done — icons pending)
 
-- App name `finamp` → `naviamp`
-- Package ID `com.unicornsonlsd.finamp` → `com.naviamp.naviamp`
-- Icons and splash screen
+- Package ID renamed: `com.unicornsonlsd.finamp` → `com.naviamp.naviamp` (build.gradle, plist, xcodeproj, Kotlin sources)
+- App label renamed: `Finamp` → `Naviamp` (Android `app_name`, iOS `CFBundleDisplayName`)
+- Dart package name `name: finamp` left as-is (1254 upstream imports; see PROJECT_GOALS.md)
+- Icons, splash, and in-app SVG/PNG logo still use Finamp artwork — see PROJECT_GOALS.md Phase 6 asset table
 
 ---
 

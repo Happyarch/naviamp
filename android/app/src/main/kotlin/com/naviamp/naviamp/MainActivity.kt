@@ -1,4 +1,4 @@
-package com.unicornsonlsd.finamp
+package com.naviamp.naviamp
 
 import android.app.UiModeManager
 import android.content.Intent
@@ -23,13 +23,13 @@ import android.os.Build
 
 class MainActivity : AudioServiceActivity() {
     companion object {
-        private const val DOWNLOADS_SERVICE_CHANNEL = "com.unicornsonlsd.finamp/downloads_service"
+        private const val DOWNLOADS_SERVICE_CHANNEL = "com.naviamp.naviamp/downloads_service"
         private const val DOWNLOADS_SERVICE_CHANNEL_LOG_TAG = "DownloadsServiceChannel"
 
-        private const val OUTPUT_SWITCHER_CHANNEL = "com.unicornsonlsd.finamp/output_switcher"
+        private const val OUTPUT_SWITCHER_CHANNEL = "com.naviamp.naviamp/output_switcher"
         private const val OUTPUT_SWITCHER_CHANNEL_LOG_TAG = "OutputSwitcherChannel"
 
-        private const val SET_NATIVE_THEME_CHANNEL = "com.unicornsonlsd.finamp/set_native_theme"
+        private const val SET_NATIVE_THEME_CHANNEL = "com.naviamp.naviamp/set_native_theme"
         private const val SET_NATIVE_THEME_CHANNEL_LOG_TAG = "setNativeThemeChannel"
     }
 

@@ -168,7 +168,7 @@ class MusicPlayerBackgroundTask extends BaseAudioHandler with SeekHandler, Queue
   final _audioFadeStepDuration = Duration(milliseconds: 50);
   late final BehaviorSubject<FadeState> fadeState;
 
-  final outputSwitcherChannel = MethodChannel('com.unicornsonlsd.finamp/output_switcher');
+  final outputSwitcherChannel = MethodChannel('com.naviamp.naviamp/output_switcher');
 
   /// Some Bluetooth headsets send skip and pause/play media button events in
   /// very quick succession for a double-tap skip gesture. This guard ignores a

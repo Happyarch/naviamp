@@ -1,4 +1,4 @@
-package com.unicornsonlsd.finamp
+package com.naviamp.naviamp
 
 import android.content.ContentProvider
 import android.content.ContentValues

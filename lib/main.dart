@@ -389,7 +389,7 @@ Future<void> _setupOSIntegration() async {
   }
 
   if (Platform.isAndroid) {
-    var themeModeChannel = MethodChannel("com.unicornsonlsd.finamp/set_native_theme");
+    var themeModeChannel = MethodChannel("com.naviamp.naviamp/set_native_theme");
     GetIt.instance<ProviderContainer>().listen(finampSettingsProvider.themeMode, (_, mode) {
       _mainLog.info("Setting android native theme to $mode");
       themeModeChannel.invokeMethod("setNativeThemeMode", {
@@ -419,7 +419,7 @@ Future<void> _setupPlaybackServices() async {
       androidStopForegroundOnPause: FinampSettingsHelper.finampSettings.androidStopForegroundOnPause,
       androidNotificationChannelName: "Finamp",
       androidNotificationIcon: "mipmap/white",
-      androidNotificationChannelId: "com.unicornsonlsd.finamp.audio",
+      androidNotificationChannelId: "com.naviamp.naviamp.audio",
       // notificationColor: TODO use the theme color for older versions of Android,
       // We will handle preloading artwork ourselves
       preloadArtwork: false,
@@ -505,7 +505,7 @@ Future<void> _migrateDownloadsFileOwner() async {
     return;
   }
   if (!FinampSettingsHelper.finampSettings.hasCompletedDownloadsFileOwnerMigration) {
-    var downloadsServiceChannel = MethodChannel("com.unicornsonlsd.finamp/downloads_service");
+    var downloadsServiceChannel = MethodChannel("com.naviamp.naviamp/downloads_service");
     var downloadLocations = FinampSettingsHelper.finampSettings.downloadLocationsMap;
     var downloadPaths = downloadLocations.values.map((e) => e.currentPath).toList();
     await downloadsServiceChannel.invokeMethod("fixDownloadsFileOwner", <String, dynamic>{
