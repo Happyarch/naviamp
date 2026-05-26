@@ -276,8 +276,8 @@ To pull UI improvements from upstream Finamp:
 
 ## Known Limitations / TODOs
 
-- **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. `JellyfinApiHelper` is retained only for its `runInIsolate()` utility used in `downloads_service.dart`. Both files should be pruned / replaced in Phase 6.
+- **`jellyfin_api.dart` and `jellyfin_api_helper.dart`** still exist and are still registered. `JellyfinApiHelper` is retained as a thin Subsonic proxy (`getItems`, `getItemById`, `addFavorite`, `removeFavorite`) and for its `runInIsolate()` utility used by `downloads_service.dart`. Both files should be pruned / replaced in Phase 6.
 - **`FinampUser` Jellyfin fields** (`accessToken`, `serverId`, `views`) are still in the model. For Subsonic logins they are set to empty strings / empty maps. They will be cleaned up in Phase 6.
 - **`FinampUser.subsonicPassword`** field still exists in the model for migration reading (detects and migrates plaintext passwords from old installs to secure storage on first run). It is no longer written by new code. Can be removed in Phase 6 after migration window.
-- **Music browsing layer** (`music_screen_tab_view.dart` and associated Riverpod providers) still calls Jellyfin-backed providers for artist/album/song listing. This is the main remaining functionality gap — tracked in Phase 5 remaining items.
+- **Playlist editing** — `playlist_edit_screen.dart` and `AddToPlaylistScreen/` still call Jellyfin for playlist create/edit/delete. These are the only remaining Phase 5 items.
 - **`probeServer` bypasses Chopper** (`subsonic_api_helper.dart:probeServer`) — uses a raw `http.get()` call instead of going through the `SubsonicApi` Chopper client. The root cause is that Chopper's `JsonConverter.responseFactory` pipeline doesn't correctly return the parsed `Map` body when called without credentials (the response is received and logged, but `bodyOrThrow` produces a value that fails the `as Map` cast). All other authenticated API calls go through `_unwrap()` correctly. The probe should eventually be moved back to using Chopper once the converter issue is diagnosed and fixed.
