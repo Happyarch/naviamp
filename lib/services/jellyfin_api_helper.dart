@@ -924,11 +924,14 @@ class JellyfinApiHelper {
   /// Gets an item from a user's library.
   Future<BaseItemDto> getItemById(BaseItemId itemId) async {
     final sub = GetIt.instance<SubsonicApiHelper>();
-    // Try song first, then album.
     final song = await sub.getSongDto(itemId.raw);
     if (song != null) return song;
     final album = await sub.getAlbumDto(itemId);
     if (album != null) return album;
+    try {
+      final (artist, _) = await sub.getArtist(itemId.raw);
+      return artist;
+    } catch (_) {}
     throw Exception('Item not found in Subsonic: ${itemId.raw}');
   }
 
