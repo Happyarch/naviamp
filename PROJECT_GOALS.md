@@ -254,6 +254,7 @@ Wire the new Subsonic services into the live app so playback and browsing actual
 - [x] **Offline album screen null check** — `_albumToDto` was missing `childCount`; `item_info.dart` uses `item.childCount!` in offline mode; fixed by adding `childCount: album.songCount`
 - [x] **`serverMissingBlurhash` warning suppressed** — `downloads_service.dart` now checks Subsonic credentials before setting the flag; Navidrome never provides blurhashes so the "Jellyfin server misconfigured" warning was always appearing falsely
 - [x] **ThemeProvider image error level** — `_fetchImage` onError demoted from SEVERE to WARNING; empty cached image files (e.g. disc-level cover art not found) are handled gracefully and don't warrant SEVERE
+- [x] **Subsonic transcode validation** — on track download completion, checks `event.mimeType` against expected MIME for the requested codec (`_isExpectedAudioMime`); warns user via snackbar and WARNING log if Navidrome served a different format (e.g. fell back to original because no matching FFmpeg profile exists). Also estimates actual bitrate from file size ÷ duration; if >20% below requested (server capped it), updates `fileTranscodingProfile.stereoBitrate` to the actual value so the downloads UI shows the real bitrate.
 - [ ] **Playlist screens** — `playlist_edit_screen.dart`, `AddToPlaylistScreen/` still call Jellyfin for playlist create/edit/delete
 - [ ] **`network_settings_screen.dart`** — still pings Jellyfin server URL (non-functional)
 

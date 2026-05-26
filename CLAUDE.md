@@ -169,6 +169,14 @@ Several UI components (e.g. `generate_subtitle.dart` for playlists, `item_info.d
 
 `FinampStorableQueueInfo.trackCount` uses `_countIds()` (a length-prefix walker) — never `~/ 16` (old hex assumption). `_unpackIntList` uses `trackCount` to size its bit-buffer read; a wrong count causes an assertion crash.
 
+### Subsonic transcode validation on download
+
+`downloads_service.dart` validates audio downloads on completion:
+
+1. **Format check** (`_isExpectedAudioMime`): compares `event.mimeType` from the HTTP response against the expected MIME type for the requested codec (`ogg`→`audio/ogg`, `aac`→`audio/aac`/`audio/mp4`, `mp3`→`audio/mpeg`). If Navidrome has no FFmpeg profile for the requested format, it falls back to serving the original file — wrong extension, wrong codec, possibly unplayable. Mismatch triggers a WARNING log and a snackbar.
+
+2. **Bitrate correction**: estimates actual bitrate as `(fileSizeBytes * 8) / durationSecs`. If >20% below the requested `stereoBitrate` (server capped it silently), updates `fileTranscodingProfile.stereoBitrate` so the downloads UI shows the real bitrate rather than the requested one.
+
 ### `serverMissingBlurhash` is suppressed for Navidrome
 
 `downloads_service.dart` now guards the `serverMissingBlurhash = true` assignment with a check for Subsonic credentials. Without this guard the downloads tab always shows "Jellyfin server misconfigured" because Navidrome never provides blurhashes.

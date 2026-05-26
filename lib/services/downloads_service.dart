@@ -246,6 +246,68 @@ class DownloadsService {
                   );
                   listener.path = listener.path!.replaceFirst(RegExp(r'\.image$'), extension);
                 }
+
+                // Subsonic transcode validation for audio tracks.
+                if (listener.type == DownloadItemType.track) {
+                  final profile = listener.fileTranscodingProfile;
+                  final requestedContainer = profile?.codec.container;
+
+                  // 1. Format check — compare MIME type of what Navidrome served
+                  //    against what the transcode profile requested. A mismatch
+                  //    means the server had no matching FFmpeg profile and fell back
+                  //    to the original file; the saved file will have the wrong
+                  //    extension and may fail to play.
+                  if (requestedContainer != null && event.mimeType != null) {
+                    if (!_isExpectedAudioMime(requestedContainer, event.mimeType!)) {
+                      _downloadsLogger.warning(
+                        "${listener.name}: requested $requestedContainer but server "
+                        "returned ${event.mimeType}. Check Navidrome transcoding profiles.",
+                      );
+                      GlobalSnackbar.message(
+                        (_) => "Download warning: '${listener.name}' — server returned "
+                            "${event.mimeType} instead of $requestedContainer. "
+                            "Check Navidrome transcoding settings.",
+                      );
+                    }
+                  }
+
+                  // 2. Async bitrate check — estimate actual bitrate from file size
+                  //    and track duration. Updates the stored stereoBitrate if the
+                  //    server capped it significantly below the requested value
+                  //    (Navidrome silently clamps to its configured max without
+                  //    telling the client).
+                  if (profile != null &&
+                      profile.codec != FinampTranscodingCodec.original &&
+                      listener.baseItem?.runTimeTicks != null) {
+                    final taskIsarId = listener.isarId;
+                    final durationTicks = listener.baseItem!.runTimeTicks!;
+                    final requestedBps = profile.stereoBitrate;
+                    unawaited(Future.sync(() async {
+                      try {
+                        final path = await event.task.filePath();
+                        final fileSizeBytes = await File(path).length();
+                        if (durationTicks > 0) {
+                          final durationSecs = durationTicks / 10000000.0;
+                          final actualBps = ((fileSizeBytes * 8) / durationSecs).round();
+                          if (actualBps < (requestedBps * 0.80).round()) {
+                            _downloadsLogger.warning(
+                              "${listener.name}: requested ${requestedBps ~/ 1000} kbps "
+                              "but estimated actual is ${actualBps ~/ 1000} kbps — "
+                              "Navidrome capped the bitrate.",
+                            );
+                            final item = _isar.downloadItems.getSync(taskIsarId);
+                            if (item?.fileTranscodingProfile != null) {
+                              item!.fileTranscodingProfile!.stereoBitrate = actualBps;
+                              _isar.writeTxnSync(() => _isar.downloadItems.putSync(item));
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        _downloadsLogger.fine("Bitrate estimation failed: $e");
+                      }
+                    }));
+                  }
+                }
               }
 
               if (newState == DownloadItemState.failed) {
@@ -850,6 +912,20 @@ class DownloadsService {
   /// Verify a download is complete and the associated file exists.  Update
   /// the item to be notDownloaded otherwise.  Used by [gettrackDownload] and
   /// [getImageDownload].
+  /// Returns true if [mimeType] is a plausible Content-Type for the given
+  /// Subsonic [container] name (e.g. "ogg", "aac", "mp3").
+  static bool _isExpectedAudioMime(String container, String mimeType) {
+    const expected = <String, List<String>>{
+      'ogg': ['audio/ogg', 'audio/x-ogg'],
+      'aac': ['audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/m4a'],
+      'mp3': ['audio/mpeg', 'audio/mp3'],
+      'flac': ['audio/flac', 'audio/x-flac'],
+    };
+    final list = expected[container];
+    if (list == null) return true; // unknown container, assume OK
+    return list.any((m) => mimeType.startsWith(m));
+  }
+
   bool _verifyDownload(DownloadItem item) {
     assert(item.type.hasFiles);
     if (!item.state.isComplete) return false;
