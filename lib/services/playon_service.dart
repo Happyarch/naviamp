@@ -16,6 +16,7 @@ import '../../services/finamp_settings_helper.dart';
 import '../../services/jellyfin_api_helper.dart';
 import '../../services/music_player_background_task.dart';
 import 'finamp_user_helper.dart';
+import 'subsonic_user_helper.dart';
 
 final _playOnServiceLogger = Logger("PlayOnService");
 final _finampUserHelper = GetIt.instance<FinampUserHelper>();
@@ -94,6 +95,8 @@ class PlayOnService {
 
   Future<void> startListener() async {
     abortConnect = false;
+    // PlayOn is a Jellyfin-specific WebSocket protocol. Skip entirely on Navidrome.
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) return;
     try {
       if (!FinampSettingsHelper.finampSettings.isOffline &&
           FinampSettingsHelper.finampSettings.enablePlayon &&

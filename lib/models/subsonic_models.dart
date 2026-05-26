@@ -297,8 +297,14 @@ class SubsonicAlbumID3 {
   final List<SubsonicRecordLabel>? recordLabels; // OpenSubsonic
   final List<SubsonicDiscTitle>? discTitles; // OpenSubsonic
   final List<String>? moods; // OpenSubsonic
+  // Navidrome sends these as ItemDate objects ({}), not strings.
+  // We don't use them in BaseItemDto mapping, so skip deserialization.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   final String? originalReleaseDate; // OpenSubsonic
+  @JsonKey(includeFromJson: false, includeToJson: false)
   final String? releaseDate; // OpenSubsonic
+  // releaseTypes is a string[] in OpenSubsonic, not a single string.
+  @JsonKey(includeFromJson: false, includeToJson: false)
   final String? releaseTypes; // OpenSubsonic
   final int? bpm; // OpenSubsonic
   final String? comment; // OpenSubsonic
