@@ -23,6 +23,7 @@ import 'finamp_settings_helper.dart';
 import 'finamp_user_helper.dart';
 import 'jellyfin_api.dart' as jellyfin_api;
 import 'subsonic_api_helper.dart';
+import 'subsonic_user_helper.dart';
 
 class JellyfinApiHelper {
   final jellyfinApi = jellyfin_api.JellyfinApi.create(true);
@@ -866,6 +867,12 @@ class JellyfinApiHelper {
   /// Starts an instant mix using the data from the item provided.
   Future<List<BaseItemDto>?> getInstantMix(BaseItemDto parentItem, {int? limit}) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      return GetIt.instance<SubsonicApiHelper>().getInstantMix(
+        parentItem.id.raw,
+        count: limit ?? FinampSettingsHelper.finampSettings.trackShuffleItemCount,
+      );
+    }
     var response = await jellyfinApi.getInstantMix(
       id: parentItem.id,
       userId: _finampUserHelper.currentUser!.id,
@@ -878,6 +885,10 @@ class JellyfinApiHelper {
   /// Get's similar albums based off a source album.
   Future<List<BaseItemDto>?> getSimilarAlbums(BaseItemId parentId, {int? limit}) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      // Subsonic has no similar-albums API; return null so callers fall back to their own logic.
+      return null;
+    }
     var response = await jellyfinApi.getSimilarAlbums(
       id: parentId,
       userId: _finampUserHelper.currentUser!.id,
@@ -1137,6 +1148,10 @@ class JellyfinApiHelper {
 
   Future<List<BaseItemDto>?> getArtistMix(List<BaseItemId> artistIds) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      if (artistIds.isEmpty) return [];
+      return GetIt.instance<SubsonicApiHelper>().getInstantMix(artistIds.first.raw);
+    }
     final response = await jellyfinApi.getItems(
       userId: _finampUserHelper.currentUser!.id,
       parentId: _finampUserHelper.currentUser!.currentView?.id,
@@ -1153,6 +1168,10 @@ class JellyfinApiHelper {
 
   Future<List<BaseItemDto>?> getAlbumMix(List<BaseItemId> albumIds) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      if (albumIds.isEmpty) return [];
+      return GetIt.instance<SubsonicApiHelper>().getInstantMix(albumIds.first.raw);
+    }
     final response = await jellyfinApi.getItems(
       userId: _finampUserHelper.currentUser!.id,
       albumIds: albumIds.join(","),
@@ -1168,6 +1187,12 @@ class JellyfinApiHelper {
 
   Future<List<BaseItemDto>?> getGenreMix(List<BaseItemId> genreIds) async {
     assert(_verifyCallable());
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      if (genreIds.isEmpty) return [];
+      final songs = await GetIt.instance<SubsonicApiHelper>().getSongsByGenre(genreIds.first.raw, count: 300);
+      songs.shuffle();
+      return songs;
+    }
     final response = await jellyfinApi.getItems(
       userId: _finampUserHelper.currentUser!.id,
       parentId: _finampUserHelper.currentUser!.currentView?.id,
@@ -1257,6 +1282,10 @@ class JellyfinApiHelper {
   }
 
   Future<bool> pingLocalServer() async {
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      // For Navidrome, re-use pingActiveServer which already pings the Subsonic endpoint.
+      return pingActiveServer();
+    }
     FinampUser? user = GetIt.instance<FinampUserHelper>().currentUser;
     if (user == null) return false;
     return await _pingSpecificServer(user.localAddress);
@@ -1269,6 +1298,15 @@ class JellyfinApiHelper {
   }
 
   Future<bool> pingActiveServer() async {
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      try {
+        await GetIt.instance<SubsonicApiHelper>().ping().timeout(const Duration(seconds: 3));
+        return true;
+      } catch (e) {
+        _jellyfinApiHelperLogger.fine('pingActiveServer (Subsonic): $e');
+        return false;
+      }
+    }
     try {
       Response<dynamic>? response = await jellyfinApi
           .pingServer()

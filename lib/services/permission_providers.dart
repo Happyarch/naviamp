@@ -2,6 +2,7 @@ import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/jellyfin_models.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
 import 'package:finamp/services/jellyfin_api_helper.dart';
+import 'package:finamp/services/subsonic_user_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get_it/get_it.dart';
 
@@ -75,6 +76,11 @@ final AutoDisposeProviderFamily<bool, BaseItemDto> canEditPlaylistProvider = Aut
 
 final AutoDisposeFutureProviderFamily<bool?, BaseItemId> _canEditPlaylistAsyncProvider =
     AutoDisposeFutureProviderFamily((ref, BaseItemId id) {
+      // Navidrome has no per-playlist user permission API; all playlists
+      // created by the current user are always editable.
+      if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+        return Future.value(true);
+      }
       return GetIt.instance<JellyfinApiHelper>()
           .getPlaylistUser(id)
           .then((response) {
