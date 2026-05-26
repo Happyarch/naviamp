@@ -110,7 +110,12 @@ class SubsonicApiHelper {
       final (album, _) = await getAlbum(id.raw);
       return album;
     } catch (e) {
-      _log.warning('getAlbumDto failed for ${id.raw}: $e');
+      // 70 = not found — expected when used as a fallback in getItemById.
+      if (e is SubsonicException && e.isNotFound) {
+        _log.fine('getAlbumDto: ${id.raw} not found');
+      } else {
+        _log.warning('getAlbumDto failed for ${id.raw}: $e');
+      }
       return null;
     }
   }
@@ -144,7 +149,12 @@ class SubsonicApiHelper {
       final song = SubsonicChild.fromJson(inner['song'] as Map<String, dynamic>);
       return _childToDto(song);
     } catch (e) {
-      _log.warning('getSongDto failed for $id: $e');
+      // 70 = not found — expected when used as a fallback in getItemById.
+      if (e is SubsonicException && e.isNotFound) {
+        _log.fine('getSongDto: $id not found');
+      } else {
+        _log.warning('getSongDto failed for $id: $e');
+      }
       return null;
     }
   }

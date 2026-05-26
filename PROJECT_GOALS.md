@@ -242,15 +242,15 @@ Wire the new Subsonic services into the live app so playback and browsing actual
 - [x] `music_player_background_task.dart` — `_trackUri()` replaced: direct play → `getStreamUrl(item)` (original file); transcode → `getStreamUrl(item, format: subsonicFormat, maxBitRate: kbps)`; `FinampTranscodingStreamingFormat.codec` maps directly to Subsonic format names (vorbis → "ogg")
 - [x] `downloads_service_backend.dart` — `IsarTaskQueue` now uses `SubsonicApiHelper.getDownloadUrl()` / `getStreamUrl()` / `getCoverArtUrl()` for all download URL construction; Subsonic auth is in query params so no `Authorization` header is set; `DownloadsSyncService._getCollectionInfo/Children/_getFinampCollectionChildren` fully rewritten to use Subsonic endpoints dispatched by item type; lyrics fetched unconditionally via `getLyricsAsDto()` (no Jellyfin MediaStream check needed)
 - [x] `downloads_service.dart` — repair step 4 lyrics fetch replaced with `SubsonicApiHelper.getLyricsAsDto()`; `getSong` endpoint added to `subsonic_api.dart` for per-song metadata fetches; `toJson()` instance methods added to all `@JsonSerializable` Subsonic model classes (required by `explicitToJson: true` on parent classes)
-- [ ] **Music browsing layer** — replace `JellyfinApiHelper.getItems()` calls in `music_screen_tab_view.dart` and provider files with `SubsonicApiHelper` equivalents:
-  - [ ] `music_screen_tab_view.dart` — paginated artist/album/song/genre/playlist listing
-  - [ ] `album_screen_provider.dart` — songs within an album
-  - [ ] `artist_content_provider.dart` — albums and tracks for an artist
-  - [ ] `genre_screen_provider.dart` — items within a genre
-  - [ ] `item_amount_provider.dart` — item counts for UI
-  - [ ] `favorite_provider.dart` — star/unstar and starred item listing
-- [ ] **Playlist screens** — replace Jellyfin calls in `playlist_edit_screen.dart`, `AddToPlaylistScreen/`
-- [ ] **Player chips** — `artist_chip.dart`, `album_chip.dart`, `genre_chip.dart` still look up items via Jellyfin
+- [x] **Music browsing layer** — `JellyfinApiHelper.getItems()`, `getItemsWithTotalRecordCount()`, `getItemById()`, `addFavorite()`, `removeFavorite()` overridden to dispatch to `SubsonicApiHelper` via `_subsonicFetch()`. All UI provider files left untouched. Working: artists, albums, songs, genres, playlists, search, favorites, artist discography, album track listing.
+- [x] **`SubsonicAlbumID3` deserialization** — `originalReleaseDate`, `releaseDate`, `releaseTypes` marked `@JsonKey(includeFromJson: false, includeToJson: false)`; Navidrome sends these as objects/arrays instead of strings
+- [x] **Queue persistence** — `FinampStorableQueueInfo.packIds`/`_unpackIds` rewritten with 4-byte length-prefix UTF-8 encoding; old 16-byte hex UUID format crashed for Navidrome's alphanumeric IDs
+- [x] **Track sort order** — `_subsonicSort` handles `ParentIndexNumber`/`IndexNumber` (disc→track for album views) and `PremiereDate`/`ProductionYear` (year for artist discography)
+- [x] **`PlayOnService` silenced** — returns early in `startListener()` when Subsonic credentials are present; eliminates 405 spam to Navidrome's non-Jellyfin endpoints
+- [x] **`getItemById` artist fallback** — tries song → album → artist in sequence; fixes `artistItemProvider` in `artist_chip.dart` which calls `getItemById(artistId)` on render
+- [x] **Log level** — `getSongDto`/`getAlbumDto` demote `SubsonicException(70)` from WARNING to FINE; reduces noise from expected fallback misses
+- [ ] **Playlist screens** — `playlist_edit_screen.dart`, `AddToPlaylistScreen/` still call Jellyfin for playlist create/edit/delete
+- [ ] **`network_settings_screen.dart`** — still pings Jellyfin server URL (non-functional)
 
 ### Phase 6 — Branding
 - [ ] App name: `finamp` → `naviamp` in `pubspec.yaml`

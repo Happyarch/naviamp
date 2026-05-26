@@ -45,11 +45,11 @@ After editing any file with `@JsonSerializable` or `@ChopperApi` annotations, re
 | `lib/components/` and `lib/screens/` | **Do not modify** (upstream UI parity). Exception: login screens that are Jellyfin-specific have already been replaced. |
 | `lib/models/jellyfin_models.dart` | **Keep intact** — the UI uses these types (`BaseItemDto`, etc.). |
 | `lib/services/subsonic_*.dart` | Navidrome backend — primary development target. |
-| `lib/services/jellyfin_api_helper.dart` | Legacy Jellyfin layer. Retained for `runInIsolate()` only. Many browsing methods still call it (known gap — see below). |
+| `lib/services/jellyfin_api_helper.dart` | Acts as a Subsonic proxy — `getItems`, `getItemById`, `addFavorite`, `removeFavorite` all dispatch to `SubsonicApiHelper`. `runInIsolate()` still used by downloads. |
 
 ### State management / DI
 
-- **Riverpod** — UI state
+- **Riverpod** — UI state. `providerDidFail` in `main.dart` surfaces any provider exception as a `GlobalSnackbar.error`, so provider failures are always user-visible. Avoid throwing from providers for expected missing-item cases.
 - **get_it** — service locator (singletons injected at startup in `lib/main.dart`)
 - **Isar** — local database
 - **Chopper 8.5.1** — generated HTTP client
@@ -92,29 +92,46 @@ final inner = _unwrap(await _api.getArtists());
 
 ---
 
+## Key patterns in jellyfin_api_helper.dart
+
+### `_subsonicFetch` — central Subsonic dispatch
+
+`getItems()` and `getItemsWithTotalRecordCount()` both delegate to `_subsonicFetch()`. It dispatches on 8 cases in order:
+
+1. **itemIds batch** — resolves a list of IDs via `getSongDto` (used by queue restore)
+2. **searchTerm** — calls `search3()`; filters result by `includeItemTypes`
+3. **Playlist parent** — calls `getPlaylist()`
+4. **MusicArtist parent** — calls `getArtist()`; returns albums or expands to tracks
+5. **MusicAlbum parent** — calls `getAlbum()` for track list
+6. **genreFilter** — calls `getAlbumList2(byGenre)` or `getSongsByGenre()`
+7. **isFavorite** — calls `getStarred()`
+8. **Top-level by type** — MusicArtist→`getArtists`, MusicAlbum→`getAlbumList2`, Audio→`getRandomSongs`, MusicGenre→`getGenres`, Playlist→`getPlaylists`
+
+### `_subsonicSort` — client-side sort
+
+Called after fetching lists that Subsonic can't sort server-side (artists, genres, playlists, artist album children). Takes the **first comma-separated key** from the Jellyfin sort string and maps it:
+
+| First key | Sort behaviour |
+|---|---|
+| `Random` | shuffle |
+| `ParentIndexNumber` or `IndexNumber` | disc → track → name (for album tracks) |
+| `PremiereDate` or `ProductionYear` | `productionYear` → name (for artist discography order) |
+| anything else | `sortName` → `name` (alphabetical) |
+
+### `getItemById` fallback chain
+
+Tries in order: `getSongDto` → `getAlbumDto` → `getArtist`. All three are wrapped in null/catch so the method only throws when all three fail. `SubsonicException(70)` (not found) is demoted to FINE-level logging in `getSongDto` and `getAlbumDto` because it is expected when the ID is an artist.
+
+---
+
 ## Known gaps (as of latest commit)
 
-### Music browsing layer — Jellyfin still used
+### Remaining Jellyfin remnants
 
-`lib/components/MusicScreen/music_screen_tab_view.dart` and these provider files still call `JellyfinApiHelper.getItems()` against the server:
-
-- `lib/services/album_screen_provider.dart`
-- `lib/services/artist_content_provider.dart`
-- `lib/services/genre_screen_provider.dart`
-- `lib/services/item_amount_provider.dart`
-- `lib/services/favorite_provider.dart`
-
-These will fail against a Navidrome server. The app can log in, view music folders, play (if a queue is loaded), and download — but browsing the library (artists / albums / songs / genres tabs) is non-functional.
-
-**The fix:** replace the `JellyfinApiHelper.getItems()` calls in each provider with the appropriate `SubsonicApiHelper` methods (`getArtists`, `getAlbumList2`, `getGenres`, `search3`, `getStarred`, etc.).
-
-### Other Jellyfin remnants
-
-- `lib/screens/playlist_edit_screen.dart` — uses `JellyfinApiHelper` for playlist edits
-- `lib/components/AddToPlaylistScreen/` — playlist creation/listing via Jellyfin
-- `lib/components/PlayerScreen/artist_chip.dart`, `album_chip.dart`, `genre_chip.dart` — item lookups via Jellyfin
-- `lib/services/favorite_provider.dart` — star/unstar via Jellyfin
-- `lib/screens/network_settings_screen.dart` — pings Jellyfin server
+- `lib/screens/playlist_edit_screen.dart` — playlist editing still via Jellyfin
+- `lib/components/AddToPlaylistScreen/` — playlist creation/listing still via Jellyfin
+- `lib/screens/network_settings_screen.dart` — pings Jellyfin server URL (non-functional / harmless)
+- `lib/services/PlayOnService` — silenced for Navidrome (returns early when Subsonic credentials are present), but the Jellyfin WebSocket code is still there
 
 ### Phase 6 branding (not started)
 
@@ -138,6 +155,14 @@ class SubsonicFoo {
 
 Parent classes that override: use `@override`. This is required because parent classes use `explicitToJson: true`.
 
+### OpenSubsonic field type mismatches
+
+Navidrome sends some OpenSubsonic extension fields with unexpected JSON types. Use `@JsonKey(includeFromJson: false, includeToJson: false)` to ignore fields where the Navidrome type doesn't match the Dart type and the field isn't used in `BaseItemDto` mapping. Current examples in `SubsonicAlbumID3`: `originalReleaseDate`, `releaseDate`, `releaseTypes`.
+
+### Queue persistence
+
+`FinampStorableQueueInfo.packIds` / `_unpackIds` use a **4-byte length-prefix + UTF-8** format (not the old 16-byte hex UUID format). Any Navidrome alphanumeric ID is stored correctly. Old hex-format queues saved before this change decode as empty lists.
+
 ---
 
 ## Android testing
@@ -150,11 +175,11 @@ adb install -r build/app/outputs/flutter-apk/app-debug.apk
 # Launch (debug package gets a .debug suffix):
 adb shell monkey -p com.unicornsonlsd.finamp.debug -c android.intent.category.LAUNCHER 1
 
-# Stream logs:
-adb logcat --pid=$(adb shell pidof -s com.unicornsonlsd.finamp.debug)
+# Stream logs (warnings/errors only):
+adb logcat --pid=$(adb shell pidof -s com.unicornsonlsd.finamp.debug) | grep -E "WARNING|SEVERE|ERROR"
 ```
 
-The device runs the app over Tailscale. Navidrome is at `http://100.121.132.84:4533` (HTTP, not HTTPS). Cleartext HTTP is already enabled in `android/app/src/main/AndroidManifest.xml` and `network_security_config.xml`.
+The device runs the app over Tailscale to a local Navidrome instance (HTTP, not HTTPS). Cleartext HTTP is already enabled in `android/app/src/main/AndroidManifest.xml` and `network_security_config.xml`.
 
 ---
 
@@ -165,3 +190,4 @@ The device runs the app over Tailscale. Navidrome is at `http://100.121.132.84:4
 - **Do not** modify UI widget files in `lib/components/` or `lib/screens/` unless absolutely required — keep them upstream-compatible.
 - **Do not** use `Response<dynamic>` anywhere in Subsonic code — Chopper returns the body, not the wrapper.
 - **Do** run `build_runner` after any annotation change before building.
+- **Do not** throw from Riverpod providers for expected missing-item cases — use null returns or fallbacks. Unhandled provider exceptions surface as snackbar errors via `providerDidFail` in `main.dart`.
