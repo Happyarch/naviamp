@@ -1270,6 +1270,16 @@ class DownloadsSyncService {
             rethrow;
           }
         }
+        // getAlbumDto swallows SubsonicException internally and returns null on
+        // not-found, so the catch above never fires for that case. If the album
+        // lookup returned null and the subtype was guessed (not from Isar), try
+        // artist. This handles album-artist and track-artist info links where the
+        // ID is an artist but subtype defaulted to album.
+        if (dto == null && subtype == BaseItemDtoType.album && isarItem == null) {
+          try {
+            dto = (await _subsonicApiHelper.getArtist(id.raw)).$1;
+          } catch (_) {}
+        }
       }
       final item = dto == null ? null : DownloadStub.fromItem(item: dto, type: type);
       _downloadsService.resetConnectionErrors();
