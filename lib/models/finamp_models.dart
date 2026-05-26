@@ -3968,28 +3968,34 @@ class FinampStorableQueueInfo extends FinampStorableQueueInfoLegacy {
     }
   }
 
+  // IDs are stored as: [4-byte big-endian length][UTF-8 bytes]. This handles
+  // both Jellyfin hex UUIDs and Navidrome's alphanumeric IDs.
   static List<BaseItemId> _unpackIds(Uint8List ids) {
-    List<BaseItemId> out = [];
-    for (int i = 0; i < ids.length; i += 16) {
-      String id = "";
-      for (int j = 0; j < 16; j++) {
-        id += ids[i + j].toRadixString(16).padLeft(2, "0");
-      }
-      out.add(BaseItemId(id));
+    final out = <BaseItemId>[];
+    int i = 0;
+    while (i + 4 <= ids.length) {
+      final len = (ids[i] << 24) | (ids[i + 1] << 16) | (ids[i + 2] << 8) | ids[i + 3];
+      i += 4;
+      if (i + len > ids.length) break;
+      out.add(BaseItemId(utf8.decode(ids.sublist(i, i + len))));
+      i += len;
     }
     return out;
   }
 
-  /// Pack a list of BaseItemIds into a Uint8Lis.  BaseItemIds are assumed to be
-  /// 16 byte values formatted as a hexadecimal string.
   static Uint8List packIds(List<BaseItemId> ids) {
-    final buffer = Uint8List(ids.length * 16);
-    for (int i = 0; i < buffer.length; i++) {
-      final stringIndex = (i % 16) * 2;
-      final hex = ids[i ~/ 16].raw.substring(stringIndex, stringIndex + 2);
-      buffer[i] = int.parse(hex, radix: 16);
+    final bytes = <int>[];
+    for (final id in ids) {
+      final idBytes = utf8.encode(id.raw);
+      final len = idBytes.length;
+      bytes
+        ..add((len >> 24) & 0xff)
+        ..add((len >> 16) & 0xff)
+        ..add((len >> 8) & 0xff)
+        ..add(len & 0xff);
+      bytes.addAll(idBytes);
     }
-    return buffer;
+    return Uint8List.fromList(bytes);
   }
 
   @override

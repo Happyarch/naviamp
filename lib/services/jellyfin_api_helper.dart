@@ -213,16 +213,28 @@ class JellyfinApiHelper {
     if (sortBy == null || sortBy.trim().isEmpty) return items;
     final first = sortBy.split(',').first.trim();
     if (first == 'Random') {
-      final shuffled = List<BaseItemDto>.from(items)..shuffle();
-      return shuffled;
+      return List<BaseItemDto>.from(items)..shuffle();
     }
     final desc = sortOrder?.toLowerCase() == 'descending';
     final sorted = List<BaseItemDto>.from(items);
-    sorted.sort((a, b) {
-      final av = a.sortName ?? a.name ?? '';
-      final bv = b.sortName ?? b.name ?? '';
-      return desc ? bv.compareTo(av) : av.compareTo(bv);
-    });
+    switch (first) {
+      case 'ParentIndexNumber' || 'IndexNumber':
+        sorted.sort((a, b) {
+          final disc = (a.parentIndexNumber ?? 0).compareTo(b.parentIndexNumber ?? 0);
+          if (disc != 0) return desc ? -disc : disc;
+          final track = (a.indexNumber ?? 0).compareTo(b.indexNumber ?? 0);
+          if (track != 0) return desc ? -track : track;
+          final av = a.sortName ?? a.name ?? '';
+          final bv = b.sortName ?? b.name ?? '';
+          return desc ? bv.compareTo(av) : av.compareTo(bv);
+        });
+      default:
+        sorted.sort((a, b) {
+          final av = a.sortName ?? a.name ?? '';
+          final bv = b.sortName ?? b.name ?? '';
+          return desc ? bv.compareTo(av) : av.compareTo(bv);
+        });
+    }
     return sorted;
   }
 
