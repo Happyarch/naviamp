@@ -1373,6 +1373,9 @@ class JellyfinApiHelper {
   }
 
   Future<bool> pingPublicServer() async {
+    if (GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      return pingActiveServer();
+    }
     FinampUser? user = GetIt.instance<FinampUserHelper>().currentUser;
     if (user == null) return false;
     return await _pingSpecificServer(user.publicAddress);
