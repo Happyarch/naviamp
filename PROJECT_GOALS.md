@@ -19,11 +19,11 @@ Naviamp is a fork of [Finamp](https://github.com/jmshrv/finamp) that replaces th
 
 ## Dev Environment Setup
 
-Source `dev-env.sh` in the project root whenever you start a session:
+Source `dev-env.sh` in the project root at the start of each session:
 ```sh
 source dev-env.sh
 ```
-This sets `JAVA_HOME`, `ANDROID_HOME`, and PATH without permanently modifying your shell.
+Sets `JAVA_HOME`, `ANDROID_HOME`, and PATH without permanently modifying the shell.
 
 ### One-time setup
 
@@ -191,117 +191,139 @@ Functionally equivalent: `getPlaylists`, `getPlaylist(id)`, `createPlaylist`, `u
 ## Implementation Phases
 
 ### Phase 0 — Dev Environment ✅ Complete
-- [x] Initialize `.flutter` submodule — Flutter 3.44.0 / Dart 3.12.0 @ `heads/stable`
-- [x] Install Android SDK to `~/Android/Sdk` — build-tools 36.0.0, platforms android-35/36, NDK 28.2, CMake 3.22
-- [x] Install Rust via `rustup` (required by `flutter_discord_rpc`)
-- [x] `./flutterw doctor` — Android toolchain green
-- [x] `./flutterw pub get && ./flutterw pub run build_runner build`
-- [x] `./flutterw build apk --debug` succeeds
+
+| Task | Status |
+|---|---|
+| Initialize `.flutter` submodule — Flutter 3.44.0 / Dart 3.12.0 | ✅ |
+| Install Android SDK (build-tools 36.0.0, android-35/36, NDK 28.2, CMake 3.22) | ✅ |
+| Install Rust via `rustup` (required by `flutter_discord_rpc`) | ✅ |
+| `./flutterw doctor` — Android toolchain green | ✅ |
+| `pub get` + `build_runner build` succeed | ✅ |
+| `./flutterw build apk --debug` succeeds | ✅ |
 
 ### Phase 1 — Navidrome Models ✅ Complete
+
 `lib/models/subsonic_models.dart` + generated `.g.dart`
-- [x] `SubsonicEnvelope.unwrap()` — parses and validates the `subsonic-response` envelope
-- [x] `SubsonicException` — error codes including auth, not-found, missing-params
-- [x] `SubsonicChild` (song), `SubsonicArtistID3`, `SubsonicAlbumID3` — full OpenSubsonic fields
-- [x] `SubsonicPlaylist` / `SubsonicPlaylistWithSongs`, `SubsonicSearchResult3`, `SubsonicStarred2`
-- [x] `SubsonicStructuredLyrics` / `SubsonicLyricsList` — OpenSubsonic synced lyrics
-- [x] `SubsonicServerInfo` — server version/type from ping envelope
+
+| Task | Status |
+|---|---|
+| `SubsonicEnvelope.unwrap()` — parses and validates `subsonic-response` envelope | ✅ |
+| `SubsonicException` — error codes (auth, not-found, missing-params) | ✅ |
+| `SubsonicChild`, `SubsonicArtistID3`, `SubsonicAlbumID3` — full OpenSubsonic fields | ✅ |
+| `SubsonicPlaylist` / `SubsonicPlaylistWithSongs`, `SubsonicSearchResult3`, `SubsonicStarred2` | ✅ |
+| `SubsonicStructuredLyrics` / `SubsonicLyricsList` — OpenSubsonic synced lyrics | ✅ |
+| `SubsonicServerInfo` — server version/type from ping envelope | ✅ |
 
 ### Phase 2 — Subsonic API Client ✅ Complete
+
 `lib/services/subsonic_api.dart` + generated `.chopper.dart`, `subsonic_user_helper.dart`
-- [x] `SubsonicAuth.generateSalt()` / `generateToken()` — MD5 per-request auth
-- [x] `SubsonicApi` Chopper service — all OpenSubsonic endpoints (ping, browse, search, playlist, scrobble, lyrics, mix)
-- [x] `SubsonicInterceptor` — injects auth query params on every request
-- [x] `SubsonicUserHelper` — in-memory session; `serverUrlOverride` for login probing
-- [x] Persistence: `setSessionAndSave()` / `loadIfSaved()` backed by `FinampUser.subsonicPassword`
+
+| Task | Status |
+|---|---|
+| `SubsonicAuth.generateSalt()` / `generateToken()` — MD5 per-request auth | ✅ |
+| `SubsonicApi` Chopper service — all OpenSubsonic endpoints | ✅ |
+| `SubsonicInterceptor` — injects auth query params on every request | ✅ |
+| `SubsonicUserHelper` — in-memory session with `serverUrlOverride` for login probing | ✅ |
+| Session persistence via `setSessionAndSave()` / `loadIfSaved()` | ✅ |
 
 ### Phase 3 — Subsonic API Helper ✅ Complete
+
 `lib/services/subsonic_api_helper.dart`
-- [x] `probeServer(url)` — credential-free server detection for login UI
-- [x] `ping()` → `SubsonicServerInfo` — authenticated ping
-- [x] All browse / search / playlist / scrobble / lyrics / mix methods returning `BaseItemDto`
-- [x] `getCoverArtUrl()` / `getStreamUrl()` / `getDownloadUrl()` — auth URL builders
-- [x] DTO mappers: `_childToDto`, `_artistToDto`, `_albumToDto`, `_playlistToDto`, `_genreToDto`
+
+| Task | Status |
+|---|---|
+| `probeServer(url)` — credential-free server detection for login UI | ✅ |
+| `ping()` → `SubsonicServerInfo` — authenticated ping | ✅ |
+| Browse / search / playlist / scrobble / lyrics / mix methods returning `BaseItemDto` | ✅ |
+| `getCoverArtUrl()` / `getStreamUrl()` / `getDownloadUrl()` — auth URL builders | ✅ |
+| DTO mappers: `_childToDto`, `_artistToDto`, `_albumToDto`, `_playlistToDto`, `_genreToDto` | ✅ |
 
 ### Phase 4 — Auth & Login Flow ✅ Complete
-- [x] `FinampUser.subsonicPassword` — new HiveField(10); persists Navidrome password alongside server URL + username
-- [x] `SubsonicUserHelper.setSessionAndSave()` / `loadIfSaved()` — Isar-backed persistence
-- [x] GetIt registration: `SubsonicUserHelper` + `SubsonicApiHelper` registered at startup; session restored from Isar
-- [x] Login flow replaced: server URL probe via `probeServer()` → credentials page → `ping()` validates → session saved
-- [x] `login_user_selection_page.dart` removed (Jellyfin-specific: QuickConnect, user listing — no Navidrome equivalent)
-- [x] `LoginServerSelectionPage` now shows `NavidromeServerWidget` on successful probe
-- [x] `LoginAuthenticationPage` authenticates via Subsonic ping; no Jellyfin updateCapabilities
+
+| Task | Status |
+|---|---|
+| `FinampUser.subsonicPassword` — `HiveField(10)`; persists Navidrome password | ✅ |
+| `SubsonicUserHelper` session persistence (Isar-backed) | ✅ |
+| GetIt registration of `SubsonicUserHelper` + `SubsonicApiHelper` at startup | ✅ |
+| Login flow: probe → credentials → `ping()` validates → session saved | ✅ |
+| `login_user_selection_page.dart` removed (QuickConnect / Jellyfin user listing) | ✅ |
+| `LoginServerSelectionPage` shows `NavidromeServerWidget` on successful probe | ✅ |
+| `LoginAuthenticationPage` authenticates via Subsonic ping | ✅ |
 
 ### Phase 5 — Wiring & Cleanup 🚧 In Progress
-Wire the new Subsonic services into the live app so playback and browsing actually work:
-- [x] **Password security** — `flutter_secure_storage` replaces plaintext `subsonicPassword`; Android Keystore on Android, libsecret/Secret Service on Linux; migration from old plaintext storage on first run
-- [x] `album_image_provider.dart` — routed cover art through `SubsonicApiHelper.getCoverArtUrl()`
-- [x] `view_selector.dart` — replaced `getViews()` with `SubsonicApiHelper.getMusicFolders()`; logout now calls `SubsonicUserHelper.clearSessionAndSave()`
-- [x] `metadata_provider.dart` — synthesizes `PlaybackInfoResponse`/`MediaSourceInfo` from `SubsonicChild` fields stored in `BaseItemDto.mediaSources` by `_childToDto`; fetches lyrics via `getLyricsAsDto()` → `LyricDto`; no server round-trip for basic playback metadata
-- [x] `playback_history_service.dart` — replaced Jellyfin session endpoints with `SubsonicApiHelper.scrobble()`; `submission: false` for now-playing, `submission: true` for track completion
-- [x] `music_player_background_task.dart` — `_trackUri()` replaced: direct play → `getStreamUrl(item)` (original file); transcode → `getStreamUrl(item, format: subsonicFormat, maxBitRate: kbps)`; `FinampTranscodingStreamingFormat.codec` maps directly to Subsonic format names (vorbis → "ogg")
-- [x] `downloads_service_backend.dart` — `IsarTaskQueue` now uses `SubsonicApiHelper.getDownloadUrl()` / `getStreamUrl()` / `getCoverArtUrl()` for all download URL construction; Subsonic auth is in query params so no `Authorization` header is set; `DownloadsSyncService._getCollectionInfo/Children/_getFinampCollectionChildren` fully rewritten to use Subsonic endpoints dispatched by item type; lyrics fetched unconditionally via `getLyricsAsDto()` (no Jellyfin MediaStream check needed)
-- [x] `downloads_service.dart` — repair step 4 lyrics fetch replaced with `SubsonicApiHelper.getLyricsAsDto()`; `getSong` endpoint added to `subsonic_api.dart` for per-song metadata fetches; `toJson()` instance methods added to all `@JsonSerializable` Subsonic model classes (required by `explicitToJson: true` on parent classes)
-- [x] **Music browsing layer** — `JellyfinApiHelper.getItems()`, `getItemsWithTotalRecordCount()`, `getItemById()`, `addFavorite()`, `removeFavorite()` overridden to dispatch to `SubsonicApiHelper` via `_subsonicFetch()`. All UI provider files left untouched. Working: artists, albums, songs, genres, playlists, search, favorites, artist discography, album track listing.
-- [x] **`SubsonicAlbumID3` deserialization** — `originalReleaseDate`, `releaseDate`, `releaseTypes` marked `@JsonKey(includeFromJson: false, includeToJson: false)`; Navidrome sends these as objects/arrays instead of strings
-- [x] **Queue persistence** — `FinampStorableQueueInfo.packIds`/`_unpackIds` rewritten with 4-byte length-prefix UTF-8 encoding; old 16-byte hex UUID format crashed for Navidrome's alphanumeric IDs
-- [x] **Track sort order** — `_subsonicSort` handles `ParentIndexNumber`/`IndexNumber` (disc→track for album views) and `PremiereDate`/`ProductionYear` (year for artist discography)
-- [x] **`PlayOnService` silenced** — returns early in `startListener()` when Subsonic credentials are present; eliminates 405 spam to Navidrome's non-Jellyfin endpoints
-- [x] **`getItemById` artist fallback** — tries song → album → artist in sequence; fixes `artistItemProvider` in `artist_chip.dart` which calls `getItemById(artistId)` on render
-- [x] **Log level** — `getSongDto`/`getAlbumDto` demote `SubsonicException(70)` from WARNING to FINE; reduces noise from expected fallback misses
-- [x] **`trackCount` fix** — replaced `~/ 16` formula with `_countIds()` that walks 4-byte length-prefix format; fixes `_unpackIntList` assertion crash on queue restore
-- [x] **Playlist tab null check** — `_playlistToDto` was missing `childCount`; `generateSubtitle` uses `item.childCount!` for playlists; fixed by adding `childCount: playlist.songCount`
-- [x] **Offline album screen null check** — `_albumToDto` was missing `childCount`; `item_info.dart` uses `item.childCount!` in offline mode; fixed by adding `childCount: album.songCount`
-- [x] **`serverMissingBlurhash` warning suppressed** — `downloads_service.dart` now checks Subsonic credentials before setting the flag; Navidrome never provides blurhashes so the "Jellyfin server misconfigured" warning was always appearing falsely
-- [x] **ThemeProvider image error level** — `_fetchImage` onError demoted from SEVERE to WARNING; empty cached image files (e.g. disc-level cover art not found) are handled gracefully and don't warrant SEVERE
-- [x] **Subsonic transcode validation** — on track download completion, checks `event.mimeType` against expected MIME for the requested codec (`_isExpectedAudioMime`); warns user via snackbar and WARNING log if Navidrome served a different format (e.g. fell back to original because no matching FFmpeg profile exists). Also estimates actual bitrate from file size ÷ duration; if >20% below requested (server capped it), updates `fileTranscodingProfile.stereoBitrate` to the actual value so the downloads UI shows the real bitrate.
-- [x] **Auto-offline detection fixed** — `pingActiveServer()` and `pingLocalServer()` now route through `SubsonicApiHelper.ping()` when Subsonic credentials are present; previously called Jellyfin `/pingServer` which always failed for Navidrome, causing the app to falsely enter offline mode.
-- [x] **Mix / radio fixed for Navidrome** — `getInstantMix`, `getArtistMix`, `getAlbumMix` now call `SubsonicApiHelper.getInstantMix(id)`; `getGenreMix` calls `getSongsByGenre()` + shuffle; `getSimilarAlbums` returns `null` for Navidrome (callers fall back to artist-based selection). Previously all four called Jellyfin endpoints, producing 404/500 errors.
-- [x] **Playlist edit permission fixed** — `canEditPlaylistProvider` now short-circuits to `true` for Navidrome users; previously called `getPlaylistUser` (Jellyfin-only) which always threw, causing `catchError → false` and hiding the edit button even for the playlist owner.
-- [x] **Offline artist list missing downloaded artists** — `_getCollectionInfo` in `downloads_service_backend.dart` defaulted to `BaseItemDtoType.album` when an ID was not yet in Isar. `getAlbumDto` swallows not-found exceptions and returns `null`, so the existing `SubsonicException` fallback to `getArtist` never fired. Added a `null`-result fallback: if `getAlbumDto` returns `null` and the subtype was guessed (not from Isar), try `getArtist`. Affects both album-to-artist and track-to-artist info links. Existing downloads need a resync to populate the missing links.
-- [x] **Playlist create/edit/delete** — all playlist mutation operations now routed through Subsonic: `createNewPlaylist` uses `createPlaylistGetId`; `updatePlaylist` dispatches to `replacePlaylistTracks` (track-list overwrite via `createPlaylist(playlistId)`) or `updatePlaylist` (name/public metadata); `addItemstoPlaylist` expands non-song IDs (albums, artists, playlists, genres) to song IDs before calling Subsonic `updatePlaylist(songIdToAdd)`; `removeItemsFromPlaylist` parses 0-based index strings (stored as `playlistItemId` by `getPlaylist`) and calls Subsonic `updatePlaylist(songIndexToRemove)`. `getPlaylist` now sets `playlistItemId = index.toString()` on every returned song so the remove flow has the index it needs.
-- [ ] **`network_settings_screen.dart`** — still pings Jellyfin server URL (non-functional)
+
+| Task | Status | Notes |
+|---|---|---|
+| Password security | ✅ | `flutter_secure_storage`; Android Keystore / libsecret; migration from plaintext on first run |
+| `album_image_provider.dart` | ✅ | Cover art routed through `getCoverArtUrl()` |
+| `view_selector.dart` | ✅ | `getViews()` → `getMusicFolders()`; logout clears `SubsonicUserHelper` |
+| `metadata_provider.dart` | ✅ | Synthesizes `PlaybackInfoResponse` from `SubsonicChild` fields; lyrics via `getLyricsAsDto()` |
+| `playback_history_service.dart` | ✅ | Jellyfin session endpoints → `SubsonicApiHelper.scrobble()` |
+| `music_player_background_task.dart` | ✅ | `_trackUri()` uses `getStreamUrl()`; codec names map directly to Subsonic format strings |
+| `downloads_service_backend.dart` | ✅ | All URL construction + sync logic rewritten for Subsonic; auth in query params |
+| `downloads_service.dart` | ✅ | Lyrics fetch + repair step; `toJson()` added to all Subsonic models |
+| Music browsing layer | ✅ | `getItems`, `getItemsWithTotalRecordCount`, `getItemById`, favorites dispatch via `_subsonicFetch()` |
+| `SubsonicAlbumID3` deserialization | ✅ | Bad-typed OpenSubsonic fields ignored via `@JsonKey(includeFromJson: false)` |
+| Queue persistence | ✅ | 4-byte length-prefix UTF-8 encoding; old 16-byte hex format crashed on Navidrome IDs |
+| Track sort order | ✅ | `_subsonicSort` handles disc/track (`ParentIndexNumber`) and year (`PremiereDate`) keys |
+| `PlayOnService` silenced | ✅ | Returns early when Subsonic credentials present; stops 405 spam |
+| `getItemById` artist fallback | ✅ | Tries song → album → artist; fixes `artistItemProvider` in `artist_chip.dart` |
+| Log level for `SubsonicException(70)` | ✅ | `getSongDto`/`getAlbumDto` demote not-found from WARNING to FINE |
+| `trackCount` fix | ✅ | `_countIds()` replaces `~/ 16`; fixes `_unpackIntList` assertion crash on queue restore |
+| Playlist `childCount` null check | ✅ | `_playlistToDto` sets `childCount`; `generateSubtitle` uses `item.childCount!` |
+| Album `childCount` null check | ✅ | `_albumToDto` sets `childCount`; `item_info.dart` uses `item.childCount!` offline |
+| `serverMissingBlurhash` suppressed | ✅ | Guards Subsonic credentials; Navidrome never provides blurhashes |
+| `ThemeProvider` image error level | ✅ | `_fetchImage` onError demoted SEVERE → WARNING |
+| Subsonic transcode validation | ✅ | MIME check + bitrate correction on download completion; snackbar on codec mismatch |
+| Auto-offline detection | ✅ | `pingLocalServer()` routes through `SubsonicApiHelper.ping()` |
+| Mix / radio | ✅ | `getInstantMix`, `getArtistMix`, `getAlbumMix`, `getGenreMix` via Subsonic |
+| Playlist edit permission | ✅ | `canEditPlaylistProvider` short-circuits to `true` for Navidrome users |
+| Offline artist list | ✅ | `_getCollectionInfo` falls back to `getArtist` on null album lookup; existing downloads need resync |
+| Playlist create / edit / delete | ✅ | All mutations via Subsonic; index-based removal bridged via `playlistItemId` string |
+| `network_settings_screen.dart` | ⬜ | Still pings Jellyfin server URL (non-functional, harmless) |
 
 ### Phase 6 — Branding
 
-**Completed code renames (already done):**
-- [x] Android `applicationId` / `namespace`: `com.unicornsonlsd.finamp` → `com.naviamp.naviamp`
-- [x] Android `app_name` resource: `Finamp` / `Finamp Profile` / `Finamp Debug` → `Naviamp` / `Naviamp Profile` / `Naviamp Debug`
-- [x] Android deep-link scheme: `finamp://` → `naviamp://`
-- [x] Kotlin source directory moved: `com/unicornsonlsd/finamp/` → `com/naviamp/naviamp/`
-- [x] Kotlin package declarations + MethodChannel constants updated
-- [x] iOS `CFBundleDisplayName` / `CFBundleName` / `PRODUCT_BUNDLE_IDENTIFIER` / URL scheme updated in all 3 plist files and `project.pbxproj`
-- [x] iOS permission strings (`NSAppleMusicUsageDescription`): `Finamp` → `Naviamp`
-- [x] Dart MethodChannel names updated to match Kotlin (`com.naviamp.naviamp/...`)
-- [x] Linux DBus names updated (`com.naviamp.Naviamp` / `com.naviamp.NaviampSettings`)
-- [x] Linux `.desktop` file and `msix_config` in `pubspec.yaml` updated
-- [x] Linux icon files renamed `finamp.png` → `naviamp.png` under `assets/icon/linux/`
-- [x] `generate_icons.sh` output filename updated
-- [ ] Dart **package name** `name: finamp` in `pubspec.yaml` intentionally left as-is — renaming it would require touching 1254 `package:finamp/` import statements across upstream UI files, destroying future cherry-pick compatibility. The Dart package name is internal only and never visible to users.
-- [ ] `lib/screens/settings_screen.dart` repo/release links — update once the naviamp GitHub repo URL is known
-- [ ] `assets/com.unicornsonlsd.finamp.metainfo.xml` — Linux AppStream metainfo file; rename and rewrite for Naviamp (only matters for Flatpak/Linux packaging)
+**Code renames:**
 
-**Assets you must create before the branding is complete:**
+| Task | Status | Notes |
+|---|---|---|
+| Android `applicationId` / `namespace` | ✅ | `com.naviamp.naviamp` |
+| Android `app_name` strings | ✅ | Naviamp / Naviamp Profile / Naviamp Debug |
+| Android deep-link scheme | ✅ | `naviamp://` |
+| Kotlin sources moved + package declarations updated | ✅ | `com/naviamp/naviamp/` |
+| iOS bundle ID / display name / URL scheme | ✅ | All 3 plists + `project.pbxproj` → `com.naviamp.naviamp` |
+| iOS permission strings | ✅ | `NSAppleMusicUsageDescription` updated |
+| Dart MethodChannel names | ✅ | `com.naviamp.naviamp/...` aligned with Kotlin |
+| Linux DBus names | ✅ | `com.naviamp.Naviamp` / `com.naviamp.NaviampSettings` |
+| Linux `.desktop` + `msix_config` | ✅ | |
+| Linux icon files renamed | ✅ | `finamp.png` → `naviamp.png` (9 sizes under `assets/icon/linux/`) |
+| `generate_icons.sh` output filename | ✅ | |
+| Dart package name (`name: finamp` in `pubspec.yaml`) | ⬜ | Intentionally deferred — renaming touches 1254 `package:finamp/` imports across upstream UI files, destroying cherry-pick compatibility. Internal to Dart toolchain; never user-visible. |
+| `settings_screen.dart` repo/release links | ⬜ | Needs naviamp GitHub URL |
+| `assets/com.unicornsonlsd.finamp.metainfo.xml` | ⬜ | Linux AppStream metainfo; rename + rewrite (only relevant for Flatpak packaging) |
 
-The project uses `flutter_launcher_icons` (v0.14.1) and `flutter_native_splash` to generate derived assets from source files. You only need to create/replace the source files listed below — run `./flutterw pub run flutter_launcher_icons` and `./flutterw pub run flutter_native_splash:create` after replacing them to regenerate everything else.
+**Assets which must be created before branding is complete:**
 
-| Source file | Current size | Format | Purpose |
+The project uses `flutter_launcher_icons` (v0.14.1) and `flutter_native_splash` to generate derived assets from source files. Only the source files below need to be created or replaced — running `./flutterw pub run flutter_launcher_icons` and `./flutterw pub run flutter_native_splash:create` afterwards regenerates everything else.
+
+| Source file | Size | Format | Purpose |
 |---|---|---|---|
-| `assets/icon/icon_combined.png` | 4320×4320 | PNG, RGBA | Primary icon source for Android/iOS (full icon with background). Referenced by `flutter_launcher_icons: image_path`. Must have a square background color. |
-| `assets/icon/icon_combined_macos.png` | 1024×1024 | PNG, RGBA | macOS app icon source. Referenced by `flutter_launcher_icons: macos.image_path`. |
-| `assets/icon/icon_foreground.png` | 4320×4320 | PNG, RGBA | Android adaptive icon foreground layer (logo only, transparent background). Referenced by `flutter_launcher_icons: adaptive_icon_foreground`. Current adaptive background color is `#000B25` (dark navy) — keep or change in `pubspec.yaml`. |
-| `assets/icon/icon_foreground.svg` | vector | SVG | SVG source for the foreground; used by `generate_icons.sh` via `inkscape` to produce Linux icon sizes. Replace the primary logo path. |
-| `assets/icon/icon_foreground_noborder.svg` | vector | SVG | Variant without border padding; also used by `generate_icons.sh` for tighter Linux sizes. |
-| `assets/icon/icon_white_noborder.png` | 4320×4320 | PNG, single-channel white | Android 13+ monochrome / themed icon. Must be white-on-transparent only. |
+| `assets/icon/icon_combined.png` | 4320×4320 | PNG, RGBA | Primary icon source for Android/iOS (full icon with background). `flutter_launcher_icons: image_path`. Background color must be square and opaque. |
+| `assets/icon/icon_combined_macos.png` | 1024×1024 | PNG, RGBA | macOS app icon source. `flutter_launcher_icons: macos.image_path`. |
+| `assets/icon/icon_foreground.png` | 4320×4320 | PNG, RGBA | Android adaptive icon foreground layer (logo only, transparent background). `flutter_launcher_icons: adaptive_icon_foreground`. Adaptive background color is `#000B25` in `pubspec.yaml`. |
+| `assets/icon/icon_foreground.svg` | vector | SVG | SVG source for the foreground; used by `generate_icons.sh` via `inkscape` for Linux icon sizes. |
+| `assets/icon/icon_foreground_noborder.svg` | vector | SVG | Variant without border padding; also used by `generate_icons.sh`. |
+| `assets/icon/icon_white_noborder.png` | 4320×4320 | PNG, white-on-transparent | Android 13+ monochrome / themed icon. Must be white-on-transparent only. |
 | `assets/icon/icon_white_noborder.svg` | vector | SVG | SVG source for the monochrome variant. |
-| `assets/splash_ios_light.png` | see below | PNG | iOS splash center logo (light mode). |
+| `assets/splash_ios_light.png` | — | PNG | iOS splash center logo (light mode). |
 
-**After replacing SVG sources**, regenerate Linux icons with:
+After replacing SVG sources, regenerate Linux icons with:
 ```sh
 cd assets/icon && bash generate_icons.sh   # requires inkscape + imagemagick
 ```
 
-**Android derived assets (auto-generated by `flutter_launcher_icons` — do not edit manually):**
+**Android derived assets — auto-generated by `flutter_launcher_icons`, do not edit manually:**
 
 | Directory | File | Pixel size |
 |---|---|---|
@@ -316,9 +338,9 @@ cd assets/icon && bash generate_icons.sh   # requires inkscape + imagemagick
 | `drawable-xhdpi` | `ic_launcher_monochrome.png` | 216×216 |
 | `drawable-xxhdpi` | `ic_launcher_monochrome.png` | 324×324 |
 | `drawable-xxxhdpi` | `ic_launcher_monochrome.png` | 432×432 |
-| `drawable-v24` | `ic_launcher_foreground.xml` | adaptive icon vector (currently Finamp logo paths) — **replace manually** or regenerate |
+| `drawable-v24` | `ic_launcher_foreground.xml` | Adaptive icon vector — currently contains Finamp logo paths; replace manually or regenerate |
 
-**Android splash (auto-generated by `flutter_native_splash` — do not edit manually):**
+**Android splash — auto-generated by `flutter_native_splash`, do not edit manually:**
 
 | Directory | File | Pixel size | Notes |
 |---|---|---|---|
@@ -326,19 +348,19 @@ cd assets/icon && bash generate_icons.sh   # requires inkscape + imagemagick
 | `drawable-*/android12splash.png` | Android 12+ splash | same 5 sizes + 5 `-night-*` variants | |
 | `drawable[-night]/background.png` | 1×1 background color | — | Color-only, not artwork |
 
-**iOS derived assets (auto-generated — do not edit manually):**
+**iOS derived assets — auto-generated, do not edit manually:**
 All sizes in `ios/Runner/Assets.xcassets/AppIcon.appiconset/` are generated from `icon_combined.png`. Largest required: **1024×1024** (App Store). Sizes needed: 20, 29, 40, 50, 57, 60, 72, 76, 83.5, 1024 pt at 1–3× scale.
 
 iOS launch images in `ios/Runner/Assets.xcassets/LaunchImage.imageset/`: 128×128 (@1x), 256×256 (@2x), 384×384 (@3x).
 
-**Jellyfin-specific image to replace:**
+**Jellyfin-specific images to replace:**
 
 | File | Size | Current use | Action |
 |---|---|---|---|
-| `images/jellyfin-icon-transparent.png` | 512×512 | Discord RPC server icon fallback (`finamp_models.dart:3639`) | Replace with Navidrome logo PNG (512×512) or a generic Naviamp icon |
-| `images/finamp.png` | 432×432 | Discord RPC fallback icon + `assets.gen.dart` reference | Replace with naviamp logo PNG at same size; rename to `images/naviamp.png` and update `pubspec.yaml` asset list + `assets.gen.dart` |
-| `images/finamp_cropped.png` | 512×512 | Discord RPC fallback icon setting preview | Replace + rename to `images/naviamp_cropped.png` |
-| `images/finamp_cropped.svg` | vector | `finamp_icon.dart` (app header icon) and `main.dart` hero logo | **Most visible in-app asset.** Replace SVG artwork; rename to `images/naviamp_cropped.svg`; update references in `lib/components/finamp_icon.dart:15` and `lib/main.dart:825` |
+| `images/jellyfin-icon-transparent.png` | 512×512 | Discord RPC server icon fallback (`finamp_models.dart:3639`) | Replace with Navidrome logo PNG (512×512) or generic Naviamp icon |
+| `images/finamp.png` | 432×432 | Discord RPC fallback icon + `assets.gen.dart` reference | Replace; rename to `images/naviamp.png`; update `pubspec.yaml` asset list and `lib/gen/assets.gen.dart` |
+| `images/finamp_cropped.png` | 512×512 | Discord RPC fallback icon setting preview | Replace; rename to `images/naviamp_cropped.png` |
+| `images/finamp_cropped.svg` | vector | `finamp_icon.dart` (app header icon) and `main.dart` hero logo | **Most visible in-app asset.** Replace SVG artwork; rename to `images/naviamp_cropped.svg`; update `lib/components/finamp_icon.dart:15` and `lib/main.dart:825` |
 
 After renaming `images/` files, update `pubspec.yaml` asset paths (lines 207–215) and regenerate `lib/gen/assets.gen.dart` with `build_runner`.
 
