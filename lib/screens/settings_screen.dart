@@ -33,8 +33,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  static const repoLink = "https://github.com/jmshrv/finamp";
-  static const releaseNotesLink = "https://github.com/jmshrv/finamp/releases";
+  static const repoLink = "https://github.com/Happyarch/naviamp";
+  static const releaseNotesLink = "https://github.com/Happyarch/naviamp/releases";
   static const translationsLink = "https://hosted.weblate.org/projects/finamp";
 
   @override

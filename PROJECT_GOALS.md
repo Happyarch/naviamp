@@ -300,7 +300,7 @@ Functionally equivalent: `getPlaylists`, `getPlaylist(id)`, `createPlaylist`, `u
 | Linux icon files renamed | ✅ | `finamp.png` → `naviamp.png` (9 sizes under `assets/icon/linux/`) |
 | `generate_icons.sh` output filename | ✅ | |
 | Dart package name (`name: finamp` in `pubspec.yaml`) | ⬜ | Intentionally deferred — renaming touches 1254 `package:finamp/` imports across upstream UI files, destroying cherry-pick compatibility. Internal to Dart toolchain; never user-visible. |
-| `settings_screen.dart` repo/release links | ⬜ | Needs naviamp GitHub URL |
+| `settings_screen.dart` repo/release links | ✅ | Needs naviamp GitHub URL |
 | `assets/com.unicornsonlsd.finamp.metainfo.xml` | ⬜ | Linux AppStream metainfo; rename + rewrite (only relevant for Flatpak packaging) |
 
 **Assets which must be created before branding is complete:**
