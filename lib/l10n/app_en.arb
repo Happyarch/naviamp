@@ -1,9 +1,9 @@
 {
-  "finamp": "Finamp",
+  "finamp": "Naviamp",
   "@finamp": {
     "description": "App name, possibly translated"
   },
-  "finampTagline": "An open source Jellyfin music player",
+  "finampTagline": "An open source Navidrome music player",
   "@finampTagline": {
     "description": "Tagline / short description for the app"
   },
@@ -11,7 +11,7 @@
   "@startupErrorTitle": {
     "description": "The title for the error screen that shows when startup fails."
   },
-  "startupErrorCallToAction": "Please create an issue on \"github.com/jmshrv/finamp\" with the logs (use the button below) and a screenshot of this page, so that we can fix it as quickly as possible.",
+  "startupErrorCallToAction": "Please create an issue on \"github.com/Happyarch/naviamp\" with the logs (use the button below) and a screenshot of this page, so that we can fix it as quickly as possible.",
   "@startupErrorCallToAction": {
     "description": "The subtitle / call to action for what to do after encountering a startup error"
   },
@@ -19,7 +19,7 @@
   "@startupErrorWorkaround": {
     "description": "The subtitle for how to manually recover from a startup error"
   },
-  "about": "About Finamp",
+  "about": "About Naviamp",
   "@about": {
     "description": "Label for the about/info button on the settings screen"
   },
@@ -27,7 +27,7 @@
   "@aboutContributionPrompt": {
     "description": "Text shown in the about screen, explaining that the app is made by volunteers and that the user could be one of them."
   },
-  "aboutContributionLink": "Contribute to Finamp on GitHub:",
+  "aboutContributionLink": "Contribute to Naviamp on GitHub:",
   "@aboutContributionLink": {
     "description": "Link to the Finamp GitHub repository, shown in the about screen."
   },
@@ -35,11 +35,11 @@
   "@aboutReleaseNotes": {
     "description": "Link to the release notes, shown in the about screen."
   },
-  "aboutTranslations": "Help translate Finamp into your language:",
+  "aboutTranslations": "Help translate Naviamp into your language:",
   "@aboutTranslations": {
     "description": "Link to the translation project, shown in the about screen."
   },
-  "aboutThanks": "Thank you for using Finamp!",
+  "aboutThanks": "Thank you for using Naviamp!",
   "@aboutThanks": {
     "description": "Thank you message shown in the about screen."
   },
@@ -69,7 +69,7 @@
   "@changeLanguage": {
     "description": "Label for button shown during the login process that allows the user to change the app language"
   },
-  "loginFlowServerSelectionHeading": "Connect to Jellyfin",
+  "loginFlowServerSelectionHeading": "Connect to Navidrome",
   "@loginFlowServerSelectionHeading": {
     "description": "Heading for the server selection step during the login flow."
   },
@@ -79,11 +79,11 @@
   },
   "serverUrl": "Server URL",
   "@serverUrl": {},
-  "internalExternalIpExplanation": "If you want to be able to access your Jellyfin server remotely, you need to use your external IP.\n\nIf your server is on a HTTP default port (80 or 443) or Jellyfin's default port (8096), you don't have to specify the port.\n\nIf the URL is correct, you should see some information about your server pop up below the input field.",
+  "internalExternalIpExplanation": "If you want to be able to access your Navidrome server remotely, you need to use your external IP.\n\nIf your server is on a HTTP default port (80 or 443) or Navidrome's default port (4533), you don't have to specify the port.\n\nIf the URL is correct, you should see some information about your server pop up below the input field.",
   "@internalExternalIpExplanation": {
     "description": "Extra info for which IP to use for remote access, and info on whether or not the user needs to specify a port."
   },
-  "serverUrlHint": "e.g. demo.jellyfin.org/stable",
+  "serverUrlHint": "e.g. demo.navidrome.org",
   "@serverUrlHint": {
     "description": "Hint text for the server URL input field. Should be the address to an actual, public Jellyfin server."
   },
@@ -616,7 +616,7 @@
   "@playbackSpeedControlSettingSubtitle": {
     "description": "Subtitle for the playback speed visibility setting"
   },
-  "playbackSpeedControlSettingDescription": "Automatic:\nFinamp tries to identify whether the track you are playing is a podcast or (part of) an audiobook. This is considered to be the case if the track is longer than {trackDuration} minutes, if the track''s album is longer than {albumDuration} hours, or if the track has at least one of these genres assigned: {genreList}\nPlayback speed controls will then be shown in the player screen menu.\n\nShown:\nThe playback speed controls will always be shown in the player screen menu.\n\nHidden:\nThe playback speed controls in the player screen menu are always hidden.",
+  "playbackSpeedControlSettingDescription": "Automatic:\nNaviamp tries to identify whether the track you are playing is a podcast or (part of) an audiobook. This is considered to be the case if the track is longer than {trackDuration} minutes, if the track''s album is longer than {albumDuration} hours, or if the track has at least one of these genres assigned: {genreList}\nPlayback speed controls will then be shown in the player screen menu.\n\nShown:\nThe playback speed controls will always be shown in the player screen menu.\n\nHidden:\nThe playback speed controls in the player screen menu are always hidden.",
   "@playbackSpeedControlSettingDescription": {
     "description": "Description for the dropdown that selects the replay gain mode, shown in a dialog that opens when the user presses the info icon next to the dropdown",
     "placeholders": {
@@ -1321,7 +1321,7 @@
   "@reportQueueToServer": {
     "description": "Label for the setting that toggles reporting of the current queue to the Jellyfin server"
   },
-  "reportQueueToServerSubtitle": "When enabled, Finamp will send the current queue to the server. This can improve remote control and allow server-side restoration of the queue. Always enabled if the 'Play On' feature is enabled.",
+  "reportQueueToServerSubtitle": "When enabled, Naviamp will send the current queue to the server. This can improve remote control and allow server-side restoration of the queue. Always enabled if the 'Play On' feature is enabled.",
   "@reportQueueToServerSubtitle": {
     "description": "Description of the setting that toggles reporting of the current queue to the Jellyfin server"
   },
@@ -1333,7 +1333,7 @@
   "@periodicPlaybackSessionUpdateFrequencySubtitle": {
     "description": "Description of the setting that controls how frequently (in seconds) the current playback session is reported to the Jellyfin server"
   },
-  "periodicPlaybackSessionUpdateFrequencyDetails": "If the Jellyfin server hasn't received any updates from a client in the last 5 minutes, it assumes that playback has ended. This means that for tracks longer than 5 minutes, that playback could be incorrectly reported as having ended, which reduces the quality of the playback reporting data.",
+  "periodicPlaybackSessionUpdateFrequencyDetails": "If the Navidrome server hasn't received any updates from a client in the last 5 minutes, it assumes that playback has ended. This means that for tracks longer than 5 minutes, that playback could be incorrectly reported as having ended, which reduces the quality of the playback reporting data.",
   "@periodicPlaybackSessionUpdateFrequencyDetails": {
     "description": "Additional details for the setting that controls how frequently (in seconds) the current playback session is reported to the Jellyfin server"
   },
@@ -1349,7 +1349,7 @@
   "@enablePlayonTitle": {
     "description": "Label for the setting to enable Jellyfin's 'Play On' feature (remote control)"
   },
-  "enablePlayonSubtitle": "Enables Jellyfin's 'Play On' feature (remote-controlling Finamp from another client). Disable this if your reverse proxy or server doesn't support websockets.",
+  "enablePlayonSubtitle": "Enables 'Play On' remote-control support (controlling Naviamp from another client). Not currently functional with Navidrome. Disable if your reverse proxy or server doesn't support websockets.",
   "@enablePlayonSubtitle": {
     "description": "Description of the setting to enable Jellyfin's 'Play On' feature (remote control)"
   },
@@ -1569,7 +1569,7 @@
   "@noMusicLibrariesTitle": {
     "description": "Title for message that shows on the views screen when no music libraries could be found."
   },
-  "noMusicLibrariesBody": "Finamp could not find any music libraries. Please ensure that your Jellyfin server contains at least one library with the content type set to \"Music\".",
+  "noMusicLibrariesBody": "Naviamp could not find any music libraries. Please ensure that your Navidrome server contains at least one library with the content type set to \"Music\".",
   "@noMusicLibrariesBody": {},
   "refresh": "Refresh",
   "@refresh": {},
@@ -2682,15 +2682,15 @@
   },
   "preferLocalNetworkTargetAddressLocalSettingTitle": "Local Network Address",
   "@preferLocalNetworkTargetAddressLocalSettingTitle": {},
-  "preferLocalNetworkTargetAddressLocalSettingDescription": "Target address of the Jellyfin server inside your local network",
+  "preferLocalNetworkTargetAddressLocalSettingDescription": "Target address of the Navidrome server inside your local network",
   "@preferLocalNetworkTargetAddressLocalSettingDescription": {},
   "preferLocalNetworkEnableSwitchTitle": "Prefer Local Network",
   "@preferLocalNetworkEnableSwitchTitle": {},
-  "preferLocalNetworkEnableSwitchDescription": "Whether or not to use a different address when you are in the local network of your jellyfin server",
+  "preferLocalNetworkEnableSwitchDescription": "Whether or not to use a different address when you are in the local network of your Navidrome server",
   "@preferLocalNetworkEnableSwitchDescription": {},
   "preferLocalNetworkPublicAddressSettingTitle": "Public Address",
   "@preferLocalNetworkPublicAddressSettingTitle": {},
-  "preferLocalNetworkPublicAddressSettingDescription": "The primary address used to connect to your Jellyfin server",
+  "preferLocalNetworkPublicAddressSettingDescription": "The primary address used to connect to your Navidrome server",
   "@preferLocalNetworkPublicAddressSettingDescription": {},
   "preferLocalNetworkInfoBox": "This Feature requires Location permissions (and location needs to be enabled) to read the network name.",
   "@preferLocalNetworkInfoBox": {
@@ -2720,7 +2720,7 @@
   "@autoReloadQueueTitle": {
     "description": "Title for the setting that controls if the queue is automatically reloaded when the source changes"
   },
-  "autoReloadQueueSubtitle": "Automatically reload the queue when the source changes (i.e. offline mode enabled or server address switch). If disabled, Finamp will prompt you instead.",
+  "autoReloadQueueSubtitle": "Automatically reload the queue when the source changes (i.e. offline mode enabled or server address switch). If disabled, Naviamp will prompt you instead.",
   "@autoReloadQueueSubtitle": {
     "description": "Subtitle for the setting that controls if the queue is automatically reloaded when the source changes"
   },
@@ -2976,7 +2976,7 @@
   "@serverSharingMenuButtonTitle": {
     "description": "Title for the button in the drawer that opens the server sharing menu"
   },
-  "serverSharingMenuConfirmationDialogText": "Are you sure you want to enable server sharing even though you're in Offline Mode? This will cause Finamp to send data over the local network.",
+  "serverSharingMenuConfirmationDialogText": "Are you sure you want to enable server sharing even though you're in Offline Mode? This will cause Naviamp to send data over the local network.",
   "@serverSharingMenuConfirmationDialogText": {
     "description": "Dialog text shown when enabling server sharing while offline mode is enabled"
   },
@@ -3000,11 +3000,11 @@
   "@serverSharingMenuControlSubtitleSharingEnabled": {
     "description": "Subtitle of the toggle control in the server sharing menu used to turn server sharing on or off, when it's currently turned on"
   },
-  "serverSharingMenuDescription": "Sharing your server address can be useful to set up new clients that are not on the same local network as your Jellyfin server, i.e. hotel TVs, your PC at work, or a new client on your phone while you're on the go.",
+  "serverSharingMenuDescription": "Sharing your server address can be useful to set up new clients that are not on the same local network as your Navidrome server, i.e. hotel TVs, your PC at work, or a new client on your phone while you're on the go.",
   "@serverSharingMenuDescription": {
     "description": "Description text shown in the server sharing menu, right below the controls"
   },
-  "serverSharingMenuDetails": "It works by listening to server discovery requests by other clients on the local network, and then replying to those requests with the configured address of your Jellyfin server.\nIf you have both a local and public address configured, Finamp will provide both to the requesting client.",
+  "serverSharingMenuDetails": "It works by listening to server discovery requests by other clients on the local network, and then replying to those requests with the configured address of your Navidrome server.\nIf you have both a local and public address configured, Naviamp will provide both to the requesting client.",
   "@serverSharingMenuDetails": {
     "description": "Description text shown in the server sharing menu, below the description"
   },
@@ -3084,27 +3084,27 @@
   "@discordRPCIconSettingDescription": {
     "description": "Description for the setting that controls which Icon the discord RPC displays as a Fallback in case no public address is detected (it doenst matter what connection is active)."
   },
-  "discordRPCIconDark": "Finamp - Dark",
+  "discordRPCIconDark": "Naviamp - Dark",
   "@discordRPCIconDark": {
     "description": "A REALLY short description of the icon in use. Its format is 'ICON, BACKGROUND'. This one is the Finamp logo with the Dark-Theme Background"
   },
-  "discordRPCIconBlack": "Finamp - Black",
+  "discordRPCIconBlack": "Naviamp - Black",
   "@discordRPCIconBlack": {
     "description": "A REALLY short description of the icon in use. Its format is 'ICON, BACKGROUND'. This one is the Finamp logo with a Black Background"
   },
-  "discordRPCIconLight": "Finamp - White",
+  "discordRPCIconLight": "Naviamp - White",
   "@discordRPCIconLight": {
     "description": "A REALLY short description of the icon in use. Its format is 'ICON, BACKGROUND'. This one is the Finamp logo with a White Background"
   },
-  "discordRPCIconJFTransparent": "Jellyfin - Transparent",
+  "discordRPCIconJFTransparent": "Navidrome - Transparent",
   "@discordRPCIconJFTransparent": {
     "description": "A REALLY short description of the icon in use. Its format is 'ICON, BACKGROUND'. This one is the Jellyfin logo with a Transparent Background"
   },
-  "discordRPCIconTransparent": "Finamp - Transparent",
+  "discordRPCIconTransparent": "Naviamp - Transparent",
   "@discordRPCIconTransparent": {
     "description": "A REALLY short description of the icon in use. Its format is 'ICON, BACKGROUND'. This one is the Finamp logo with a Transparent Background"
   },
-  "discordRPCIconWhiteTransparent": "White Finamp - Transparent",
+  "discordRPCIconWhiteTransparent": "White Naviamp - Transparent",
   "@discordRPCIconWhiteTransparent": {
     "description": "A REALLY short description of the icon in use. Its format is 'ICON, BACKGROUND'. This one is the full white Finamp logo with a Transparent Background"
   },
@@ -3193,7 +3193,7 @@
   "@autoplayRestoredQueueSubtitle": {
     "description": "Subtitle for the setting that controls if restored queues automatically play."
   },
-  "missingBlurhashWarning": "Warning: The Jellyfin server appears to be misconfigured and is not calculating blurhashes.  This prevents Finamp from de-duplicating image downloads.  Please correct the server and run a downloads repair.",
+  "missingBlurhashWarning": "Warning: The Navidrome server appears to be misconfigured and is not calculating blurhashes.  This prevents Naviamp from de-duplicating image downloads.  Please correct the server and run a downloads repair.",
   "@missingBlurhashWarning": {
     "description": "A warning message displayed on the downloads screen if the jellyfin server is missing blurhashes."
   },

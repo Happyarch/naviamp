@@ -4,7 +4,9 @@ import 'package:finamp/components/PlaybackReportingSettingsScreen/discord_rpc_ic
 import 'package:finamp/components/PlaybackReportingSettingsScreen/enabled_discord_rpc.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
+import 'package:finamp/services/subsonic_user_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 
 import '../components/PlaybackReportingSettingsScreen/enable_playon_toggle.dart';
 import '../components/PlaybackReportingSettingsScreen/periodic_playback_session_update_frequency_editor.dart';
@@ -23,6 +25,7 @@ class _PlaybackReportingSettingsScreenState extends State<PlaybackReportingSetti
   @override
   Widget build(BuildContext context) {
     bool hasRpcSupport = Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    bool isSubsonic = GetIt.instance<SubsonicUserHelper>().hasCredentials;
 
     return Scaffold(
       appBar: AppBar(
@@ -38,11 +41,11 @@ class _PlaybackReportingSettingsScreenState extends State<PlaybackReportingSetti
       body: ListView(
         padding: const EdgeInsets.only(bottom: 200.0),
         children: [
-          const EnablePlayonToggle(),
-          const PeriodicPlaybackSessionUpdateFrequencyEditor(),
-          const ReportQueueToServerToggle(),
-          const PlayOnStaleDelayEditor(),
-          const PlayOnReconnectionDelayEditor(),
+          if (!isSubsonic) const EnablePlayonToggle(),
+          if (!isSubsonic) const PeriodicPlaybackSessionUpdateFrequencyEditor(),
+          if (!isSubsonic) const ReportQueueToServerToggle(),
+          if (!isSubsonic) const PlayOnStaleDelayEditor(),
+          if (!isSubsonic) const PlayOnReconnectionDelayEditor(),
           if (hasRpcSupport) const Divider(),
           if (hasRpcSupport) const EnabledDiscordRpc(),
           if (hasRpcSupport) const DiscordRpcIconSelector(),
