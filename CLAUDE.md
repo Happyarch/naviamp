@@ -199,10 +199,10 @@ source dev-env.sh
 adb install -r build/app/outputs/flutter-apk/app-debug.apk
 
 # Launch (debug package gets a .debug suffix):
-adb shell monkey -p com.unicornsonlsd.finamp.debug -c android.intent.category.LAUNCHER 1
+adb shell monkey -p com.naviamp.naviamp.debug -c android.intent.category.LAUNCHER 1
 
 # Stream logs (warnings/errors only):
-adb logcat --pid=$(adb shell pidof -s com.unicornsonlsd.finamp.debug) | grep -E "WARNING|SEVERE|ERROR"
+adb logcat --pid=$(adb shell pidof -s com.naviamp.naviamp.debug) | grep -E "WARNING|SEVERE|ERROR"
 ```
 
 Cleartext HTTP is intentionally enabled in `android/app/src/main/AndroidManifest.xml` and `network_security_config.xml`. Many users run Navidrome on a local network or tunnel through a trusted VPN (Tailscale, ZeroTier) where transport encryption is handled at the network layer. HTTPS is recommended for open WAN deployments but is the user's responsibility — the app accepts whatever URL the user types and does not enforce a scheme.
