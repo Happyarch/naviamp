@@ -1,5 +1,6 @@
-# Session
+# Session / tooling
 llm.txt
+.claude/
 
 # Miscellaneous
 *.class
