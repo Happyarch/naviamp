@@ -175,7 +175,7 @@ class DefaultSettings {
   static const keepScreenOnOption = KeepScreenOnOption.whileLyrics;
   static const keepScreenOnWhilePluggedIn = false;
   static const hasDownloadedPlaylistInfo = false;
-  static const transcodingStreamingFormat = FinampTranscodingStreamingFormat.aacFragmentedMp4;
+  static const transcodingStreamingFormat = FinampTranscodingStreamingFormat.opusFragmentedMp4;
   static const featureChipsConfiguration = FinampFeatureChipsConfiguration(
     enabled: true,
     features: [
@@ -2803,6 +2803,10 @@ enum KeepScreenOnOption {
 
 @HiveType(typeId: 73)
 enum FinampTranscodingStreamingFormat {
+  // Legacy Jellyfin HLS variants — kept for Hive backward compatibility.
+  // For Navidrome only the `codec` string matters; container is ignored.
+  // aacMpegTS and aacFragmentedMp4 both send format=aac; show only one.
+  // vorbisFragmentedMp4 and vorbisMpegTS both send format=ogg; show only one.
   @HiveField(0)
   aacMpegTS("aac", "ts"),
   @HiveField(1)
@@ -2814,14 +2818,28 @@ enum FinampTranscodingStreamingFormat {
   @HiveField(4)
   vorbisMpegTS("vorbis", "ts"),
   @HiveField(5)
-  vorbisFragmentedMp4("vorbis", "mp4");
+  vorbisFragmentedMp4("vorbis", "mp4"),
+  @HiveField(6)
+  mp3("mp3", "mp3");
 
   const FinampTranscodingStreamingFormat(this.codec, this.container);
 
   final String codec;
 
-  /// The container to use to transport the segments
+  /// Legacy field — segment container type for Jellyfin HLS.
+  /// Navidrome's /rest/stream.view only uses [codec] as the format param.
   final String container;
+
+  /// Human-readable label for the Navidrome transcoding settings UI.
+  String get displayName => switch (this) {
+    FinampTranscodingStreamingFormat.mp3 => 'MP3',
+    FinampTranscodingStreamingFormat.aacFragmentedMp4 ||
+    FinampTranscodingStreamingFormat.aacMpegTS => 'AAC',
+    FinampTranscodingStreamingFormat.opusFragmentedMp4 => 'Opus',
+    FinampTranscodingStreamingFormat.flacFragmentedMp4 => 'FLAC (lossless)',
+    FinampTranscodingStreamingFormat.vorbisFragmentedMp4 ||
+    FinampTranscodingStreamingFormat.vorbisMpegTS => 'Ogg Vorbis',
+  };
 
   int get sampleRate => switch (this) {
     FinampTranscodingStreamingFormat.opusFragmentedMp4 => 48000,

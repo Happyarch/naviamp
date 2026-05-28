@@ -128,6 +128,17 @@ class DownloadTranscodeCodecDropdownListTile extends ConsumerWidget {
 class StreamingTranscodingFormatDropdownListTile extends ConsumerWidget {
   const StreamingTranscodingFormatDropdownListTile({super.key});
 
+  // Canonical format list for Navidrome. Only the codec string is sent to
+  // /rest/stream.view — container variants (aacMpegTS, vorbisMpegTS) are
+  // kept in the enum for Hive back-compat but excluded from the UI.
+  static const _formats = [
+    FinampTranscodingStreamingFormat.mp3,
+    FinampTranscodingStreamingFormat.aacFragmentedMp4,
+    FinampTranscodingStreamingFormat.opusFragmentedMp4,
+    FinampTranscodingStreamingFormat.flacFragmentedMp4,
+    FinampTranscodingStreamingFormat.vorbisFragmentedMp4,
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
@@ -138,11 +149,11 @@ class StreamingTranscodingFormatDropdownListTile extends ConsumerWidget {
         children: [
           Text(AppLocalizations.of(context)!.transcodingStreamingFormatSubtitle),
           FinampSettingsDropdown<FinampTranscodingStreamingFormat>(
-            dropdownItems: FinampTranscodingStreamingFormat.values
+            dropdownItems: _formats
                 .map(
                   (e) => DropdownMenuEntry<FinampTranscodingStreamingFormat>(
                     value: e,
-                    label: "${e.codec}+${e.container}".toUpperCase(),
+                    label: e.displayName,
                   ),
                 )
                 .toList(),
