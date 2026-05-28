@@ -128,7 +128,6 @@ Tries in order: `getSongDto` → `getAlbumDto` → `getArtist`. All three are wr
 
 ### Remaining Jellyfin remnants
 
-- `lib/screens/network_settings_screen.dart` — pings Jellyfin server URL (non-functional / harmless)
 - `lib/services/PlayOnService` — silenced for Navidrome (returns early when Subsonic credentials are present), but the Jellyfin WebSocket code is still there
 
 ### Phase 6 branding (code renames done — some assets pending)
