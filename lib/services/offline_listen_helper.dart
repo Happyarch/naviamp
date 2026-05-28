@@ -11,6 +11,13 @@ import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+// TODO(offline-sync): When the client transitions from offline → online, drain
+// Hive.box<OfflineListen>("OfflineListens") and submit each entry via
+// SubsonicApiHelper.scrobble(id: listen.itemId, submission: true,
+//   time: listen.timestamp * 1000).  Remove successfully submitted entries.
+// Listen for the isOffline setting change in a Riverpod provider or
+// FinampSettingsHelper stream and trigger the drain there.
+
 /// Logs offline listens or failed submissions to a file.
 class OfflineListenLogHelper {
   final _logger = Logger("OfflineListenLogHelper");

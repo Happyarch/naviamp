@@ -223,6 +223,14 @@ abstract class SubsonicApi extends ChopperService {
     @Query('submission') bool? submission,
   });
 
+  // ── Bookmarks / play position ─────────────────────────────────────────────
+  // TODO(bookmark): Implement OpenSubsonic savePlayQueue / getBookmarks to
+  // persist and restore playback position across sessions and devices.
+  // Endpoints: POST /rest/savePlayQueue.view (id, current, position ms),
+  //            GET  /rest/getPlayQueue.view (returns saved queue + position).
+  // Wire save into playback_history_service.dart reportPlaybackStopped() and
+  // restore into the queue-restore flow.
+
   // ── Lyrics ────────────────────────────────────────────────────────────────
 
   /// Legacy lyrics lookup by artist name and track title.
