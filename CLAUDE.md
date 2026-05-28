@@ -42,7 +42,7 @@ After editing any file with `@JsonSerializable` or `@ChopperApi` annotations, re
 
 | Layer | Rule |
 |---|---|
-| `lib/components/` and `lib/screens/` | **Do not modify** (upstream UI parity). Exception: login screens that are Jellyfin-specific have already been replaced. |
+| `lib/components/` and `lib/screens/` | **Do not modify** (upstream UI parity). Exceptions already made: login screens replaced; Jellyfin-only tiles removed from `settings_screen.dart`; Jellyfin-only widgets hidden in `playback_reporting_settings_screen.dart`. |
 | `lib/models/jellyfin_models.dart` | **Keep intact** — the UI uses these types (`BaseItemDto`, etc.). |
 | `lib/services/subsonic_*.dart` | Navidrome backend — primary development target. |
 | `lib/services/jellyfin_api_helper.dart` | Acts as a Subsonic proxy — `getItems`, `getItemById`, `addFavorite`, `removeFavorite` all dispatch to `SubsonicApiHelper`. `runInIsolate()` still used by downloads. |
@@ -131,12 +131,15 @@ Tries in order: `getSongDto` → `getAlbumDto` → `getArtist`. All three are wr
 - `lib/screens/network_settings_screen.dart` — pings Jellyfin server URL (non-functional / harmless)
 - `lib/services/PlayOnService` — silenced for Navidrome (returns early when Subsonic credentials are present), but the Jellyfin WebSocket code is still there
 
-### Phase 6 branding (code renames done — icons pending)
+### Phase 6 branding (code renames done — some assets pending)
 
 - Package ID renamed: `com.unicornsonlsd.finamp` → `com.naviamp.naviamp` (build.gradle, plist, xcodeproj, Kotlin sources)
 - App label renamed: `Finamp` → `Naviamp` (Android `app_name`, iOS `CFBundleDisplayName`)
 - Dart package name `name: finamp` left as-is (1254 upstream imports; see PROJECT_GOALS.md)
-- Icons, splash, and in-app SVG/PNG logo still use Finamp artwork — see PROJECT_GOALS.md Phase 6 asset table
+- English UI strings (`lib/l10n/app_en.arb`) fully rebranded — Finamp→Naviamp, Jellyfin→Navidrome throughout
+- Quick Connect and Share Server buttons removed from `settings_screen.dart` (no Navidrome equivalents)
+- Android adaptive icon foreground updated: `drawable-v24/ic_launcher_foreground.xml` (Finamp vector) deleted; `drawable/ic_launcher_foreground.png` manually created from `assets/icon/icon_foreground.png`
+- Splash screen, in-app SVG/PNG logos (`images/finamp_cropped.svg`, Discord RPC images) still use Finamp artwork — see PROJECT_GOALS.md Phase 6 asset table
 
 ---
 
