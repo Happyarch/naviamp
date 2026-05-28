@@ -2432,20 +2432,31 @@ enum FinampTranscodingCodec {
   @HiveField(1)
   mp3("mp3", true, 1.0),
   @HiveField(2)
-  opus("ogg", false, 2.0),
+  opus("opus", false, 2.0),
   @HiveField(3)
   // Container is null to fall back to real original container per track
-  original(null, true, 99999999);
+  original(null, true, 99999999),
+  @HiveField(4)
+  vorbis("ogg", false, 1.2);
 
   const FinampTranscodingCodec(this.container, this.iosCompatible, this.quality);
 
-  /// The container to use for the given codec
+  /// Navidrome format string sent as `format=<container>` on /rest/stream.view.
+  /// Also used as the file extension for downloaded tracks.
   final String? container;
 
   final bool iosCompatible;
 
   /// Allowed codecs with higher quality*bitrate are prioritized
   final double quality;
+
+  String get displayName => switch (this) {
+    FinampTranscodingCodec.aac => 'AAC',
+    FinampTranscodingCodec.mp3 => 'MP3',
+    FinampTranscodingCodec.opus => 'Opus',
+    FinampTranscodingCodec.vorbis => 'Ogg Vorbis',
+    FinampTranscodingCodec.original => 'Original',
+  };
 }
 
 @embedded

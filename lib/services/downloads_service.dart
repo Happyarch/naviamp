@@ -917,6 +917,7 @@ class DownloadsService {
   static bool _isExpectedAudioMime(String container, String mimeType) {
     const expected = <String, List<String>>{
       'ogg': ['audio/ogg', 'audio/x-ogg'],
+      'opus': ['audio/ogg', 'audio/opus', 'audio/x-ogg'],
       'aac': ['audio/aac', 'audio/mp4', 'audio/x-m4a', 'audio/m4a'],
       'mp3': ['audio/mpeg', 'audio/mp3'],
       'flac': ['audio/flac', 'audio/x-flac'],

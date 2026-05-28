@@ -116,7 +116,7 @@ class DownloadTranscodeCodecDropdownListTile extends ConsumerWidget {
         dropdownItems: FinampTranscodingCodec.values
             .where((element) => !Platform.isIOS || element.iosCompatible)
             .where((element) => element != FinampTranscodingCodec.original)
-            .map((e) => DropdownMenuEntry<FinampTranscodingCodec>(value: e, label: e.name.toUpperCase()))
+            .map((e) => DropdownMenuEntry<FinampTranscodingCodec>(value: e, label: e.displayName))
             .toList(),
         selectedValue: ref.watch(finampSettingsProvider.downloadTranscodingProfile).codec,
         onSelected: FinampSetters.setDownloadTranscodingCodec.ifNonNull,

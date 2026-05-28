@@ -286,7 +286,7 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
             ? false
             : fields[74] as bool,
         transcodingStreamingFormat: fields[75] == null
-            ? FinampTranscodingStreamingFormat.aacFragmentedMp4
+            ? FinampTranscodingStreamingFormat.opusFragmentedMp4
             : fields[75] as FinampTranscodingStreamingFormat,
         downloadSizeWarningCutoff: fields[80] == null
             ? 150
@@ -2159,6 +2159,8 @@ class FinampTranscodingCodecAdapter
         return FinampTranscodingCodec.opus;
       case 3:
         return FinampTranscodingCodec.original;
+      case 4:
+        return FinampTranscodingCodec.vorbis;
       default:
         return FinampTranscodingCodec.aac;
     }
@@ -2175,6 +2177,8 @@ class FinampTranscodingCodecAdapter
         writer.writeByte(2);
       case FinampTranscodingCodec.original:
         writer.writeByte(3);
+      case FinampTranscodingCodec.vorbis:
+        writer.writeByte(4);
     }
   }
 
@@ -8772,12 +8776,14 @@ const _DownloadProfilecodecEnumValueMap = {
   'mp3': 1,
   'opus': 2,
   'original': 3,
+  'vorbis': 4,
 };
 const _DownloadProfilecodecValueEnumMap = {
   0: FinampTranscodingCodec.aac,
   1: FinampTranscodingCodec.mp3,
   2: FinampTranscodingCodec.opus,
   3: FinampTranscodingCodec.original,
+  4: FinampTranscodingCodec.vorbis,
 };
 
 extension DownloadProfileQueryFilter
