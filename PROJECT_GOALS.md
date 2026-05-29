@@ -390,7 +390,7 @@ To pull UI improvements from upstream Finamp:
 
 ### Client-side TODOs
 
-- **Offline play-count sync** — When offline, completed plays are logged to `Hive.box<OfflineListen>("OfflineListens")`. There is no code that drains this box and re-submits the scrobbles when the client comes back online. Implementation: listen for the `isOffline` setting transitioning `true → false` (Riverpod or FinampSettingsHelper stream), then iterate the box and call `SubsonicApiHelper.scrobble(id: listen.itemId, submission: true, time: listen.timestamp * 1000)` for each entry, removing successful submissions. The JSON file export (`listens.json`) can serve as an audit trail but is not a substitute for active sync. See `lib/services/offline_listen_helper.dart`.
+- **Offline play-count sync** — ✅ Implemented. `OfflineListenLogHelper.drainOfflineListens()` fires when connectivity is restored via `network_manager.dart:_onConnectivityChange()`. Iterates `Hive.box<OfflineListen>("OfflineListens")` and calls `SubsonicApiHelper.scrobble(submission: true)` per entry; aborts and retries on next reconnect if a call fails.
 - **OpenSubsonic bookmark / play-queue persistence** — No call to `savePlayQueue` or `getPlayQueue` is implemented. These OpenSubsonic endpoints persist the current track, position (ms), and queue across sessions and devices — equivalent to Jellyfin's resume-from-position. Implementation: call `savePlayQueue` from `reportPlaybackStopped()` in `playback_history_service.dart`; restore position via `getPlayQueue` in the queue-restore flow. See `lib/services/subsonic_api.dart` for the stub TODO.
 - **`probeServer` bypasses Chopper** (`subsonic_api_helper.dart:probeServer`) — uses a raw `http.get()` call instead of the `SubsonicApi` Chopper client. Chopper's `JsonConverter.responseFactory` pipeline fails for unauthenticated pings (response is received and logged, but `bodyOrThrow` fails the `as Map` cast). All authenticated calls use `_unwrap()` correctly. Should be moved back to Chopper once the converter issue is diagnosed.
 - **Chopper empty-body WARNING** — `[Chopper/WARNING] FormatException: Unexpected character (at character 1)` observed during testing. `JsonConverter` logs this when receiving a non-JSON body from an endpoint with `@FactoryConverter(response: JsonConverter.responseFactory)`. Handled gracefully (no snackbar, no SEVERE). Likely a Subsonic mutation endpoint (`updatePlaylist`, `createPlaylist`, or similar) that Navidrome returns with an empty body on success. TODO: identify the exact endpoint via logging, then either remove the `@FactoryConverter` annotation or handle the empty-body case in `SubsonicEnvelope.unwrap`.
@@ -398,9 +398,36 @@ To pull UI improvements from upstream Finamp:
   - *Playlist skip-if-unchanged*: `_needsMetadataUpdate()` in `downloads_service_backend.dart` unconditionally returns `true` for playlists, so every sync re-fetches every playlist even if nothing changed. Could compare stored `childCount` + `name` from Isar first; only mark needs-update if either differs. High value for libraries with many playlists.
   - *Cross-sync artist/genre cache*: `_metadataCache` and `_childCache` are cleared at the start of every `executeSyncs()`. A short-lived TTL map (5–10 min) keyed on `BaseItemId` would collapse artist/genre fetches of back-to-back syncs to zero. Albums and tracks should stay per-run.
 
-### Server-side / Navidrome Plugin Research
+### Naviamp Companion Sidecar Plugin
 
-These gaps cannot be closed from the client alone — they require either a Navidrome plugin, a companion sidecar, or a new OpenSubsonic protocol extension.
+Some client gaps cannot be closed from the client alone. The plan is a standalone Go sidecar that runs alongside Navidrome and exposes extra read-only endpoints. The client has already implemented the detection and UI infrastructure (see Phase 5 above).
 
-- **Delta sync** — OpenSubsonic has no "give me everything modified since timestamp X" endpoint, so the client must re-fetch and compare on every sync. A plugin exposing `/rest/getChanges.view?ifModifiedSince=<unix-ms>` could collapse a full library resync to a handful of calls. Key questions: (1) does Navidrome's planned plugin API expose DB-level change hooks, (2) what change granularity is needed (song-level, album-level, or dirty flag), (3) whether the OpenSubsonic working group would accept a `getChanges` extension proposal so other servers and clients could benefit.
-- **Performing artist browse** — OpenSubsonic's `getArtists` returns only album artists (artists credited as album artist on at least one album). There is no endpoint equivalent to Jellyfin's `artistIds` filter — no way to query "all albums/tracks where this person appears as a track-level performing credit." Practically: if Tom Petty & the Heartbreakers perform on a Stevie Nicks album track, that track does not appear on their artist page when the "Artists" (performing) filter is selected, only on the Stevie Nicks album. The data exists in Navidrome's database; it is simply not exposed via the Subsonic protocol. A plugin endpoint such as `/rest/getTracksByArtistId.view?id=...` would close this gap. In the meantime, both the "Album Artists" and "Artists" tabs in the browse UI show identical data (album artists only).
+#### Client-side infrastructure (already implemented)
+
+- `NaviampPluginState` sealed class (Disabled / Unknown / Absent / Present) held in a Riverpod `keepAlive` provider — single source of truth for all call sites. Call sites do a synchronous state read; no network I/O is performed per request.
+- `NaviampPluginHelper.probe()` — HTTP/HTTPS `GET <serverUrl>/naviamp/capabilities?u=...&t=...&s=...` with a 5-second timeout. Called once at startup (after session restore) and once after login. Result persisted to `FinampUser.naviampPluginLastDetected/Version` (HiveFields 11/12) as a display cache.
+- `FinampSettings.enableNaviampPlugin` (HiveField 148, default `true`) — global client toggle. When disabled, probe is skipped and plugin code paths are never entered.
+- `NaviampServerSettingsScreen` — shows enable toggle and live detected/not-detected status with a "Re-check" button.
+
+#### Sidecar architecture
+
+- **Language:** Go (single static binary, matches Navidrome ecosystem)
+- **Database:** Read-only connection to Navidrome's SQLite/PostgreSQL/MySQL database
+- **Auth:** Each request carries Subsonic auth params (`u`, `t`, `s`). Sidecar verifies by forwarding a `/rest/ping.view` to the Navidrome server. If Navidrome rejects credentials → 401.
+- **Security constraints:** Read-only queries only. All SQL is parameterised — no user-supplied paths or raw query injection. Scope is limited to data already accessible to the authenticated user via standard Subsonic.
+- **Deployment:** Same host as Navidrome. Configured via env var or config file pointing at Navidrome's base URL and DB connection string.
+
+#### Sidecar API (v1.0 target)
+
+All endpoints require Subsonic auth params and return Subsonic-envelope JSON so existing `SubsonicEnvelope.unwrap()` works unchanged.
+
+| Endpoint | Description |
+|---|---|
+| `GET /naviamp/capabilities` | Capability probe — returns `{ version, features[] }` |
+| `GET /naviamp/changes?since=<unix-ms>` | Delta sync — items with `updated_at > since`; includes `deletedIds[]` |
+| `GET /naviamp/artistTracks?id=<id>` | Tracks where artist is a performing credit, not just album artist |
+
+#### Client-side wiring (after sidecar is built)
+
+- **Delta sync** (`lib/services/downloads_service_backend.dart`): In `executeSyncs()`, check `pluginState is NaviampPluginPresent && pluginState.supports("delta-sync")`. If true, call `NaviampPluginHelper.getChanges(lastSyncAt)` and only enqueue changed/deleted items. Store `lastDeltaSyncAt` in `FinampSettings` (HiveField 149). Fall through to full resync if plugin absent.
+- **Performing artist browse** (`lib/services/subsonic_api_helper.dart`): `getTracksByArtistId(id)` — checks plugin state, calls sidecar if present, falls back to `getArtist(id)` if absent. Wire into `_subsonicFetch()` case 4 (MusicArtist → tracks) in `jellyfin_api_helper.dart`.
