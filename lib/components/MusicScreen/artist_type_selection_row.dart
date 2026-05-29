@@ -2,11 +2,13 @@ import 'dart:io';
 
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/finamp_models.dart';
 import '../../services/finamp_settings_helper.dart';
+import '../../services/naviamp_plugin_state.dart';
 
-class ArtistTypeSelectionRow extends StatelessWidget {
+class ArtistTypeSelectionRow extends ConsumerWidget {
   final TabContentType tabType;
   final ArtistType defaultArtistType;
   final void Function(TabContentType) refreshTab;
@@ -19,8 +21,15 @@ class ArtistTypeSelectionRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    if (tabType == TabContentType.artists) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Only show the selector when the server plugin can actually discriminate
+    // between album artists and performing artists.  Without the plugin both
+    // lists are identical, so the selector serves no purpose.
+    final pluginState = ref.watch(naviampPluginProvider);
+    final canDistinguishArtists =
+        pluginState is NaviampPluginPresent && pluginState.supports('performing-artists');
+
+    if (tabType == TabContentType.artists && canDistinguishArtists) {
       double screenWidth = MediaQuery.widthOf(context);
       bool alignLeft = screenWidth > 600;
 
