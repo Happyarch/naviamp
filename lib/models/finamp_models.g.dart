@@ -36,13 +36,17 @@ class FinampUserAdapter extends TypeAdapter<FinampUser> {
           ? const {}
           : (fields[5] as Map).cast<BaseItemId, BaseItemDto>(),
       subsonicPassword: fields[10] as String?,
+      naviampPluginLastDetected: fields[11] == null
+          ? false
+          : fields[11] as bool,
+      naviampPluginLastVersion: fields[12] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, FinampUser obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -62,7 +66,11 @@ class FinampUserAdapter extends TypeAdapter<FinampUser> {
       ..writeByte(9)
       ..write(obj.preferLocalNetwork)
       ..writeByte(10)
-      ..write(obj.subsonicPassword);
+      ..write(obj.subsonicPassword)
+      ..writeByte(11)
+      ..write(obj.naviampPluginLastDetected)
+      ..writeByte(12)
+      ..write(obj.naviampPluginLastVersion);
   }
 
   @override
@@ -455,6 +463,7 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
             ? PreviousTracksPersistenceMode.persistent
             : fields[145] as PreviousTracksPersistenceMode,
         useAndroidGainEffect: fields[147] == null ? true : fields[147] as bool,
+        enableNaviampPlugin: fields[148] == null ? true : fields[148] as bool,
       )
       ..disableGesture = fields[19] == null ? false : fields[19] as bool
       ..showFastScroller = fields[25] == null ? true : fields[25] as bool
@@ -473,7 +482,7 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
   @override
   void write(BinaryWriter writer, FinampSettings obj) {
     writer
-      ..writeByte(141)
+      ..writeByte(142)
       ..writeByte(0)
       ..write(obj.isOffline)
       ..writeByte(1)
@@ -755,7 +764,9 @@ class FinampSettingsAdapter extends TypeAdapter<FinampSettings> {
       ..writeByte(146)
       ..write(obj.amoledTheme)
       ..writeByte(147)
-      ..write(obj.useAndroidGainEffect);
+      ..write(obj.useAndroidGainEffect)
+      ..writeByte(148)
+      ..write(obj.enableNaviampPlugin);
   }
 
   @override
@@ -3253,18 +3264,28 @@ const FinampUserSchema = CollectionSchema(
       name: r'localAddress',
       type: IsarType.string,
     ),
-    r'preferLocalNetwork': PropertySchema(
+    r'naviampPluginLastDetected': PropertySchema(
       id: 8,
+      name: r'naviampPluginLastDetected',
+      type: IsarType.bool,
+    ),
+    r'naviampPluginLastVersion': PropertySchema(
+      id: 9,
+      name: r'naviampPluginLastVersion',
+      type: IsarType.string,
+    ),
+    r'preferLocalNetwork': PropertySchema(
+      id: 10,
       name: r'preferLocalNetwork',
       type: IsarType.bool,
     ),
     r'serverId': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'serverId',
       type: IsarType.string,
     ),
     r'subsonicPassword': PropertySchema(
-      id: 10,
+      id: 12,
       name: r'subsonicPassword',
       type: IsarType.string,
     ),
@@ -3303,6 +3324,12 @@ int _finampUserEstimateSize(
   bytesCount += 3 + object.id.length * 3;
   bytesCount += 3 + object.isarViews.length * 3;
   bytesCount += 3 + object.localAddress.length * 3;
+  {
+    final value = object.naviampPluginLastVersion;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.serverId.length * 3;
   {
     final value = object.subsonicPassword;
@@ -3327,9 +3354,11 @@ void _finampUserSerialize(
   writer.writeBool(offsets[5], object.isLocal);
   writer.writeString(offsets[6], object.isarViews);
   writer.writeString(offsets[7], object.localAddress);
-  writer.writeBool(offsets[8], object.preferLocalNetwork);
-  writer.writeString(offsets[9], object.serverId);
-  writer.writeString(offsets[10], object.subsonicPassword);
+  writer.writeBool(offsets[8], object.naviampPluginLastDetected);
+  writer.writeString(offsets[9], object.naviampPluginLastVersion);
+  writer.writeBool(offsets[10], object.preferLocalNetwork);
+  writer.writeString(offsets[11], object.serverId);
+  writer.writeString(offsets[12], object.subsonicPassword);
 }
 
 FinampUser _finampUserDeserialize(
@@ -3344,9 +3373,11 @@ FinampUser _finampUserDeserialize(
     id: reader.readString(offsets[4]),
     isLocal: reader.readBool(offsets[5]),
     localAddress: reader.readString(offsets[7]),
-    preferLocalNetwork: reader.readBool(offsets[8]),
-    serverId: reader.readString(offsets[9]),
-    subsonicPassword: reader.readStringOrNull(offsets[10]),
+    naviampPluginLastDetected: reader.readBoolOrNull(offsets[8]) ?? false,
+    naviampPluginLastVersion: reader.readStringOrNull(offsets[9]),
+    preferLocalNetwork: reader.readBool(offsets[10]),
+    serverId: reader.readString(offsets[11]),
+    subsonicPassword: reader.readStringOrNull(offsets[12]),
   );
   object.isarCurrentViewId = reader.readStringOrNull(offsets[3]);
   object.isarViews = reader.readString(offsets[6]);
@@ -3377,10 +3408,14 @@ P _finampUserDeserializeProp<P>(
     case 7:
       return (reader.readString(offset)) as P;
     case 8:
-      return (reader.readBool(offset)) as P;
+      return (reader.readBoolOrNull(offset) ?? false) as P;
     case 9:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 10:
+      return (reader.readBool(offset)) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -4578,6 +4613,186 @@ extension FinampUserQueryFilter
   }
 
   QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastDetectedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'naviampPluginLastDetected',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'naviampPluginLastVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'naviampPluginLastVersion'),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionEqualTo(String? value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'naviampPluginLastVersion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'naviampPluginLastVersion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'naviampPluginLastVersion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'naviampPluginLastVersion',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'naviampPluginLastVersion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'naviampPluginLastVersion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'naviampPluginLastVersion',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'naviampPluginLastVersion',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'naviampPluginLastVersion',
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
+  naviampPluginLastVersionIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          property: r'naviampPluginLastVersion',
+          value: '',
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterFilterCondition>
   preferLocalNetworkEqualTo(bool value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -4999,6 +5214,34 @@ extension FinampUserQuerySortBy
   }
 
   QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  sortByNaviampPluginLastDetected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastDetected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  sortByNaviampPluginLastDetectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastDetected', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  sortByNaviampPluginLastVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  sortByNaviampPluginLastVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastVersion', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
   sortByPreferLocalNetwork() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'preferLocalNetwork', Sort.asc);
@@ -5150,6 +5393,34 @@ extension FinampUserQuerySortThenBy
   }
 
   QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  thenByNaviampPluginLastDetected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastDetected', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  thenByNaviampPluginLastDetectedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastDetected', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  thenByNaviampPluginLastVersion() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastVersion', Sort.asc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
+  thenByNaviampPluginLastVersionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'naviampPluginLastVersion', Sort.desc);
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QAfterSortBy>
   thenByPreferLocalNetwork() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'preferLocalNetwork', Sort.asc);
@@ -5257,6 +5528,23 @@ extension FinampUserQueryWhereDistinct
   }
 
   QueryBuilder<FinampUser, FinampUser, QDistinct>
+  distinctByNaviampPluginLastDetected() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'naviampPluginLastDetected');
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QDistinct>
+  distinctByNaviampPluginLastVersion({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(
+        r'naviampPluginLastVersion',
+        caseSensitive: caseSensitive,
+      );
+    });
+  }
+
+  QueryBuilder<FinampUser, FinampUser, QDistinct>
   distinctByPreferLocalNetwork() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'preferLocalNetwork');
@@ -5337,6 +5625,20 @@ extension FinampUserQueryProperty
   QueryBuilder<FinampUser, String, QQueryOperations> localAddressProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'localAddress');
+    });
+  }
+
+  QueryBuilder<FinampUser, bool, QQueryOperations>
+  naviampPluginLastDetectedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'naviampPluginLastDetected');
+    });
+  }
+
+  QueryBuilder<FinampUser, String?, QQueryOperations>
+  naviampPluginLastVersionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'naviampPluginLastVersion');
     });
   }
 

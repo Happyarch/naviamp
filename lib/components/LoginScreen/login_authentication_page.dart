@@ -4,6 +4,7 @@ import 'package:finamp/components/finamp_icon.dart';
 import 'package:finamp/components/global_snackbar.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/subsonic_models.dart';
+import 'package:finamp/services/naviamp_plugin_helper.dart';
 import 'package:finamp/services/subsonic_api_helper.dart';
 import 'package:finamp/services/subsonic_user_helper.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
@@ -192,6 +193,9 @@ class _LoginAuthenticationPageState extends State<LoginAuthenticationPage> {
     } catch (e) {
       _log.warning('Failed to persist Subsonic session: $e', e);
     }
+
+    // Probe for the Naviamp plugin on the newly configured server.
+    runNaviampPluginProbe();
 
     if (!mounted) return;
     widget.onAuthenticated?.call();

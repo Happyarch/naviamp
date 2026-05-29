@@ -5,18 +5,13 @@ import 'package:audio_service/audio_service.dart';
 import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/finamp_user_helper.dart';
 import 'package:finamp/services/jellyfin_api.dart';
+import 'package:finamp/services/subsonic_api_helper.dart';
+import 'package:finamp/services/subsonic_user_helper.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-
-// TODO(offline-sync): When the client transitions from offline → online, drain
-// Hive.box<OfflineListen>("OfflineListens") and submit each entry via
-// SubsonicApiHelper.scrobble(id: listen.itemId, submission: true,
-//   time: listen.timestamp * 1000).  Remove successfully submitted entries.
-// Listen for the isOffline setting change in a Riverpod provider or
-// FinampSettingsHelper stream and trigger the drain there.
 
 /// Logs offline listens or failed submissions to a file.
 class OfflineListenLogHelper {
@@ -96,5 +91,43 @@ class OfflineListenLogHelper {
     final xFile = XFile(file.path, mimeType: "application/json");
 
     await Share.shareXFiles([xFile]);
+  }
+
+  /// Submits any pending offline listens to the server and removes successful ones.
+  ///
+  /// Call this when transitioning from offline → online. Aborts on the first
+  /// network failure and retries on the next connectivity event.
+  Future<void> drainOfflineListens() async {
+    if (!GetIt.instance<SubsonicUserHelper>().hasCredentials) return;
+
+    final box = Hive.box<OfflineListen>("OfflineListens");
+    if (box.isEmpty) return;
+
+    final api = GetIt.instance<SubsonicApiHelper>();
+    final keys = box.keys.toList();
+    int submitted = 0;
+
+    _logger.info("Draining ${keys.length} offline listen(s)");
+
+    for (final key in keys) {
+      final listen = box.get(key);
+      if (listen == null) continue;
+      try {
+        await api.scrobble(
+          id: listen.itemId,
+          submission: true,
+          time: listen.timestamp * 1000,
+        );
+        await box.delete(key);
+        submitted++;
+      } catch (e) {
+        _logger.warning("Failed to submit offline listen for ${listen.name}, aborting drain: $e");
+        break;
+      }
+    }
+
+    if (submitted > 0) {
+      _logger.info("Submitted $submitted offline listen(s); ${box.length} remaining");
+    }
   }
 }

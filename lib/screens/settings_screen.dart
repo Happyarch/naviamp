@@ -21,6 +21,7 @@ import 'layout_settings_screen.dart';
 import 'transcoding_settings_screen.dart';
 import 'view_selector.dart';
 import 'volume_normalization_settings_screen.dart';
+import 'naviamp_server_settings_screen.dart';
 import 'playback_reporting_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -188,6 +189,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ref.watch(finampSettingsProvider.locale)?.nativeDisplayLanguage ?? AppLocalizations.of(context)!.system,
             ),
             onTap: () => Navigator.of(context).pushNamed(LanguageSelectionScreen.routeName),
+          ),
+          Divider(),
+          ListTile(
+            leading: const Icon(Icons.extension_outlined),
+            title: const Text('Naviamp server plugin'),
+            onTap: () => Navigator.of(context).pushNamed(NaviampServerSettingsScreen.routeName),
           ),
           Divider(),
           const LogoutListTile(),

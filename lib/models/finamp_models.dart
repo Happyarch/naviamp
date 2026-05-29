@@ -45,6 +45,8 @@ class FinampUser {
     this.currentViewId,
     this.views = const {},
     this.subsonicPassword,
+    this.naviampPluginLastDetected = false,
+    this.naviampPluginLastVersion,
   });
 
   @HiveField(0)
@@ -83,6 +85,12 @@ class FinampUser {
 
   @HiveField(10)
   String? subsonicPassword;
+
+  @HiveField(11, defaultValue: false)
+  bool naviampPluginLastDetected;
+
+  @HiveField(12)
+  String? naviampPluginLastVersion;
 
   // We only need 1 user, the current user
   final Id isarId = 0;
@@ -255,6 +263,7 @@ class DefaultSettings {
   static const forceAudioOffloadingOnAndroid = false;
   static const previousTracksPersistenceMode = PreviousTracksPersistenceMode.persistent;
   static const useAndroidGainEffect = true;
+  static const enableNaviampPlugin = true;
 }
 
 @HiveType(typeId: 28)
@@ -400,6 +409,7 @@ class FinampSettings {
     this.forceAudioOffloadingOnAndroid = DefaultSettings.forceAudioOffloadingOnAndroid,
     this.previousTracksPersistenceMode = DefaultSettings.previousTracksPersistenceMode,
     this.useAndroidGainEffect = DefaultSettings.useAndroidGainEffect,
+    this.enableNaviampPlugin = DefaultSettings.enableNaviampPlugin,
   });
 
   @HiveField(0, defaultValue: DefaultSettings.isOffline)
@@ -860,6 +870,9 @@ class FinampSettings {
 
   @HiveField(147, defaultValue: DefaultSettings.useAndroidGainEffect)
   bool useAndroidGainEffect;
+
+  @HiveField(148, defaultValue: DefaultSettings.enableNaviampPlugin)
+  bool enableNaviampPlugin;
 
   static Future<FinampSettings> create() async {
     final downloadLocation = await DownloadLocation.create(

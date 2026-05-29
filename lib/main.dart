@@ -103,6 +103,9 @@ import 'screens/volume_normalization_settings_screen.dart';
 import 'services/audio_service_helper.dart';
 import 'services/jellyfin_api_helper.dart';
 import 'services/music_player_background_task.dart';
+import 'screens/naviamp_server_settings_screen.dart';
+import 'services/naviamp_plugin_helper.dart';
+import 'services/naviamp_plugin_state.dart';
 import 'setup_logging.dart';
 
 final _mainLog = Logger("Main()");
@@ -558,6 +561,31 @@ Future<void> _setupFinampUserHelper() async {
   GetIt.instance.registerSingleton(subsonicUserHelper);
   GetIt.instance.registerSingleton(SubsonicApiHelper());
   await subsonicUserHelper.loadIfSaved();
+
+  // Pre-seed plugin state from last-known cache so the settings page has
+  // an instant answer, then fire a fresh probe in the background.
+  _initNaviampPlugin();
+}
+
+void _initNaviampPlugin() {
+  final container = GetIt.instance<ProviderContainer>();
+  final notifier = container.read(naviampPluginProvider.notifier);
+
+  if (!FinampSettingsHelper.finampSettings.enableNaviampPlugin) {
+    notifier.setState(const NaviampPluginDisabled());
+    return;
+  }
+
+  final user = GetIt.instance<FinampUserHelper>().currentUser;
+  if (user != null && user.naviampPluginLastDetected) {
+    notifier.setState(NaviampPluginPresent(
+      version: user.naviampPluginLastVersion ?? '?',
+      features: const {},
+    ));
+  }
+
+  // Background probe to refresh state; does not block startup.
+  runNaviampPluginProbe();
 }
 
 class Finamp extends StatefulWidget {
@@ -707,6 +735,7 @@ class FinampApp extends ConsumerWidget {
         PlayerSettingsScreen.routeName: (context) => const PlayerSettingsScreen(),
         LyricsSettingsScreen.routeName: (context) => const LyricsSettingsScreen(),
         LanguageSelectionScreen.routeName: (context) => const LanguageSelectionScreen(),
+        NaviampServerSettingsScreen.routeName: (context) => const NaviampServerSettingsScreen(),
         AlbumSettingsScreen.routeName: (context) => const AlbumSettingsScreen(),
         ArtistSettingsScreen.routeName: (context) => const ArtistSettingsScreen(),
         GenreSettingsScreen.routeName: (context) => const GenreSettingsScreen(),

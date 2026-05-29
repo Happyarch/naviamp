@@ -16,6 +16,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/finamp_models.dart';
 import 'finamp_settings_helper.dart';
+import 'offline_listen_helper.dart';
 
 part 'network_manager.g.dart';
 
@@ -90,6 +91,10 @@ Future<void> _onConnectivityChange(List<ConnectivityResult>? connections) async 
   final [offlineModeActive, baseUrlChanged] = await Future.wait([_setOfflineMode(connections), changeTargetUrl()]);
   if (baseUrlChanged) {
     _reconnectPlayOnService(connections);
+  }
+  if (!offlineModeActive) {
+    // Fire-and-forget: submit any plays that were logged while offline.
+    GetIt.instance<OfflineListenLogHelper>().drainOfflineListens();
   }
   _notifyOfPausedDownloads(connections);
 }
