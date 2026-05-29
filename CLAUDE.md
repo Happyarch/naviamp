@@ -28,7 +28,7 @@ Use `./flutterw` (not `flutter`) for all Flutter commands — it targets the pin
 ./flutterw build apk --debug
 ```
 
-After editing any file with `@JsonSerializable` or `@ChopperApi` annotations, regenerate code:
+After editing any file with `@JsonSerializable`, `@ChopperApi`, or `@riverpod` annotations, regenerate code:
 
 ```sh
 ./flutterw pub run build_runner build --delete-conflicting-outputs
@@ -42,7 +42,7 @@ After editing any file with `@JsonSerializable` or `@ChopperApi` annotations, re
 
 | Layer | Rule |
 |---|---|
-| `lib/components/` and `lib/screens/` | **Do not modify** (upstream UI parity). Exceptions already made: login screens replaced; Jellyfin-only tiles removed from `settings_screen.dart`; Jellyfin-only widgets hidden in `playback_reporting_settings_screen.dart`. |
+| `lib/components/` and `lib/screens/` | **Do not modify** (upstream UI parity). Exceptions already made: login screens replaced; Jellyfin-only tiles removed from `settings_screen.dart`; Jellyfin-only widgets hidden in `playback_reporting_settings_screen.dart`; `artist_type_selection_row.dart` converted to `ConsumerWidget` to gate on plugin state. |
 | `lib/models/jellyfin_models.dart` | **Keep intact** — the UI uses these types (`BaseItemDto`, etc.). |
 | `lib/services/subsonic_*.dart` | Navidrome backend — primary development target. |
 | `lib/services/jellyfin_api_helper.dart` | Acts as a Subsonic proxy — `getItems`, `getItemById`, `addFavorite`, `removeFavorite` all dispatch to `SubsonicApiHelper`. `runInIsolate()` still used by downloads. |
@@ -56,13 +56,13 @@ After editing any file with `@JsonSerializable` or `@ChopperApi` annotations, re
 
 ### Subsonic service layer
 
-Three files implement the Navidrome backend:
-
 | File | Purpose |
 |---|---|
 | `lib/services/subsonic_api.dart` | Chopper `@ChopperApi` definitions + `SubsonicAuth` + `SubsonicInterceptor` |
 | `lib/services/subsonic_user_helper.dart` | In-memory session (server URL + credentials); reads/writes Isar |
 | `lib/services/subsonic_api_helper.dart` | High-level helper — all business logic; returns `BaseItemDto` to callers |
+| `lib/services/naviamp_plugin_state.dart` | `NaviampPluginState` sealed class + Riverpod `keepAlive` provider |
+| `lib/services/naviamp_plugin_helper.dart` | `NaviampPluginHelper.probe()` (HTTP/HTTPS capability probe) + `runNaviampPluginProbe()` |
 
 ---
 
@@ -174,7 +174,7 @@ Several UI components (e.g. `generate_subtitle.dart` for playlists, `item_info.d
 
 `downloads_service.dart` validates audio downloads on completion:
 
-1. **Format check** (`_isExpectedAudioMime`): compares `event.mimeType` from the HTTP response against the expected MIME type for the requested codec (`ogg`→`audio/ogg`, `aac`→`audio/aac`/`audio/mp4`, `mp3`→`audio/mpeg`). If Navidrome has no FFmpeg profile for the requested format, it falls back to serving the original file — wrong extension, wrong codec, possibly unplayable. Mismatch triggers a WARNING log and a snackbar.
+1. **Format check** (`_isExpectedAudioMime`): compares `event.mimeType` from the HTTP response against the expected MIME type for the requested codec (`opus`→`audio/ogg`/`audio/opus`/`audio/x-ogg`, `vorbis`→`audio/ogg`, `aac`→`audio/aac`/`audio/mp4`, `mp3`→`audio/mpeg`). Note: `opus` sends `format=opus` to Navidrome (`.opus` file); `vorbis` sends `format=ogg` (`.ogg` file). If Navidrome has no FFmpeg profile for the requested format, it falls back to serving the original file — wrong extension, wrong codec, possibly unplayable. Mismatch triggers a WARNING log and a snackbar.
 
 2. **Bitrate correction**: estimates actual bitrate as `(fileSizeBytes * 8) / durationSecs`. If >20% below the requested `stereoBitrate` (server capped it silently), updates `fileTranscodingProfile.stereoBitrate` so the downloads UI shows the real bitrate rather than the requested one.
 
@@ -190,6 +190,55 @@ Subsonic playlist mutation is index-based (remove by 0-based position) rather th
 ### `serverMissingBlurhash` is suppressed for Navidrome
 
 `downloads_service.dart` now guards the `serverMissingBlurhash = true` assignment with a check for Subsonic credentials. Without this guard the downloads tab always shows "Jellyfin server misconfigured" because Navidrome never provides blurhashes.
+
+---
+
+## Naviamp plugin infrastructure
+
+The app supports an optional Go sidecar ("Naviamp plugin") that adds capabilities not in the standard OpenSubsonic API. All plugin-dependent code paths are gated by reading a Riverpod state provider — no network I/O happens per request.
+
+### State machine
+
+`lib/services/naviamp_plugin_state.dart` defines a sealed class:
+
+```
+NaviampPluginDisabled  — user disabled extended features in settings
+NaviampPluginUnknown   — probe not yet run (startup, or setting just re-enabled)
+NaviampPluginAbsent    — probe ran, plugin not found on server
+NaviampPluginPresent   — probe ran, plugin confirmed; holds version + Set<String> features
+```
+
+The state is held in a Riverpod `@Riverpod(keepAlive: true)` provider (`naviampPluginProvider`). **Call sites always read this provider synchronously — never make a network call to check plugin presence.**
+
+### Probe lifecycle
+
+`runNaviampPluginProbe()` in `lib/services/naviamp_plugin_helper.dart`:
+- Fires at startup (after `loadIfSaved()` in `main.dart`) and after login
+- Pre-seeds provider from cached `FinampUser.naviampPluginLastDetected/Version` fields so the last-known state is available immediately
+- Makes `GET <serverUrl>/naviamp/capabilities` with Subsonic auth params; 5-second timeout; supports both HTTP and HTTPS
+- Sets provider → `Present` or `Absent`; persists result to Isar cache
+- Manual re-probe available from `NaviampServerSettingsScreen` ("Re-check" button)
+
+### Call site pattern
+
+```dart
+final pluginState = ref.read(naviampPluginProvider);
+if (pluginState is NaviampPluginPresent && pluginState.supports("performing-artists")) {
+  // plugin path
+} else {
+  // standard Subsonic fallback
+}
+```
+
+Feature strings currently defined: `"delta-sync"`, `"performing-artists"`.
+
+### Settings model fields
+
+`FinampUser` HiveFields 0–5, 7–12 used (field 6 is intentionally skipped — do not reuse it):
+- Field 11: `bool naviampPluginLastDetected` (cached probe result)
+- Field 12: `String? naviampPluginLastVersion` (cached version string)
+
+`FinampSettings` HiveField 148: `bool enableNaviampPlugin` (global client toggle; default `true`).
 
 ---
 
