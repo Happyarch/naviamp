@@ -147,6 +147,7 @@ Future<void> main({bool integrationTesting = false, bool loginTesting = false}) 
     _mainLog.info("Setup downloads service");
     await _setupProviders();
     _mainLog.info("Setup providers");
+    _initNaviampPlugin();
     await _setupOSIntegration();
     _mainLog.info("Setup os integrations");
     await _setupPlayOnService();
@@ -561,10 +562,6 @@ Future<void> _setupFinampUserHelper() async {
   GetIt.instance.registerSingleton(subsonicUserHelper);
   GetIt.instance.registerSingleton(SubsonicApiHelper());
   await subsonicUserHelper.loadIfSaved();
-
-  // Pre-seed plugin state from last-known cache so the settings page has
-  // an instant answer, then fire a fresh probe in the background.
-  _initNaviampPlugin();
 }
 
 void _initNaviampPlugin() {
