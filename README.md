@@ -51,7 +51,6 @@ source dev-env.sh
 
 ## Known Gaps
 
-- **In-app logo** — the header icon still uses placeholder Finamp artwork while Naviamp artwork is being created.
 - **Offline play-count sync** — plays logged while offline are stored locally but not yet re-submitted to the server when connectivity returns.
 - **Resume position** — OpenSubsonic `savePlayQueue` / `getPlayQueue` is not yet implemented; playback position is not persisted across sessions or devices.
 - **Release builds** — no signed release APK yet; debug builds only.
