@@ -22,10 +22,10 @@ class NaviampServerSettingsScreen extends ConsumerWidget {
           SwitchListTile(
             title: const Text('Extended server features'),
             subtitle: const Text(
-              'Enables capabilities that require the Naviamp companion plugin '
-              'running alongside your Navidrome server (delta sync, '
-              'performing artist browse, and more). Has no effect if the '
-              'plugin is not installed.',
+              'Enables capabilities that require the Naviamp companion sidecar '
+              'running behind the same reverse proxy as your Navidrome server '
+              '(delta sync, performing artist browse, and more). '
+              'Has no effect if the sidecar is not installed.',
             ),
             value: enabled ?? true,
             onChanged: (v) => FinampSetters.setEnableNaviampPlugin(v),

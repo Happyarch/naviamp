@@ -197,6 +197,23 @@ Subsonic playlist mutation is index-based (remove by 0-based position) rather th
 
 The app supports an optional Go sidecar ("Naviamp plugin") that adds capabilities not in the standard OpenSubsonic API. All plugin-dependent code paths are gated by reading a Riverpod state provider — no network I/O happens per request.
 
+### Deployment topology
+
+The sidecar runs on a separate port (default `:8090`) but is exposed to clients at the **same base URL as Navidrome** via a reverse proxy. The expected Caddy config routes `/naviamp*` to the sidecar and everything else to Navidrome:
+
+```
+:4533 {
+    handle_path /naviamp* {
+        reverse_proxy naviamp-sidecar:8090
+    }
+    handle /* {
+        reverse_proxy navidrome:4533
+    }
+}
+```
+
+The client probes `<serverUrl>/naviamp/capabilities` — this hits the reverse proxy port (4533), which routes it to the sidecar. **No separate sidecar URL is stored.** If the probe fails (no reverse proxy, sidecar not running), the app silently falls back to standard Subsonic behaviour.
+
 ### State machine
 
 `lib/services/naviamp_plugin_state.dart` defines a sealed class:
