@@ -497,6 +497,11 @@ class SubsonicApiHelper {
       imageTags: child.coverArt != null ? {'Primary': child.coverArt!} : null,
       normalizationGain:
           child.replayGain?.baseGain ?? child.replayGain?.trackGain,
+      displayComposer: child.displayComposer,
+      composerItems: child.contributors
+          ?.where((c) => c.role.toLowerCase() == 'composer')
+          .map((c) => BaseItemPerson(id: c.artist.id, name: c.artist.name, role: 'Composer'))
+          .toList(),
       communityRating: child.averageRating,
       userData: UserItemDataDto(
         isFavorite: child.starred != null,

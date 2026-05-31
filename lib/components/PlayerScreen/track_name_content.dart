@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:finamp/components/AddToPlaylistScreen/add_to_playlist_button.dart';
 import 'package:finamp/components/PlayerScreen/album_chip.dart';
 import 'package:finamp/components/PlayerScreen/artist_chip.dart';
+import 'package:finamp/components/PlayerScreen/composer_chip.dart';
 import 'package:finamp/components/PlayerScreen/player_buttons_more.dart';
 import 'package:finamp/l10n/app_localizations.dart';
 import 'package:finamp/models/finamp_models.dart';
@@ -124,6 +125,16 @@ class TrackNameContent extends ConsumerWidget {
             ),
           ),
         ),
+        if (trackBaseItemDto.displayComposer != null || (trackBaseItemDto.composerItems?.isNotEmpty ?? false))
+          Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 280),
+              child: ComposerChips(
+                baseItem: trackBaseItemDto,
+                backgroundColor: IconTheme.of(context).color!.withOpacity(0.1),
+              ),
+            ),
+          ),
       ],
     );
 

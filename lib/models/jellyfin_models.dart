@@ -1494,6 +1494,8 @@ class BaseItemDto with RunTimeTickDuration implements PlayableItem {
     this.audio,
     this.normalizationGain,
     this.hasLyrics,
+    this.displayComposer,
+    this.composerItems,
   });
 
   /// Gets or sets the name.
@@ -2095,6 +2097,12 @@ class BaseItemDto with RunTimeTickDuration implements PlayableItem {
   /// Gets or sets the HasLyrics value.
   @HiveField(152)
   bool? hasLyrics;
+
+  @HiveField(153)
+  String? displayComposer;
+
+  @HiveField(154)
+  List<BaseItemPerson>? composerItems;
 
   /// Custom helper field to determine if the BaseItemDto was created in offline mode
   bool? finampOffline;

@@ -1387,13 +1387,15 @@ class BaseItemDtoAdapter extends TypeAdapter<BaseItemDto> {
       audio: fields[150] as String?,
       normalizationGain: (fields[151] as num?)?.toDouble(),
       hasLyrics: fields[152] as bool?,
+      displayComposer: fields[153] as String?,
+      composerItems: (fields[154] as List?)?.cast<BaseItemPerson>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, BaseItemDto obj) {
     writer
-      ..writeByte(152)
+      ..writeByte(154)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -1697,7 +1699,11 @@ class BaseItemDtoAdapter extends TypeAdapter<BaseItemDto> {
       ..writeByte(151)
       ..write(obj.normalizationGain)
       ..writeByte(152)
-      ..write(obj.hasLyrics);
+      ..write(obj.hasLyrics)
+      ..writeByte(153)
+      ..write(obj.displayComposer)
+      ..writeByte(154)
+      ..write(obj.composerItems);
   }
 
   @override
@@ -3923,6 +3929,10 @@ BaseItemDto _$BaseItemDtoFromJson(Map json) => BaseItemDto(
   audio: json['Audio'] as String?,
   normalizationGain: (json['NormalizationGain'] as num?)?.toDouble(),
   hasLyrics: json['HasLyrics'] as bool?,
+  displayComposer: json['DisplayComposer'] as String?,
+  composerItems: (json['ComposerItems'] as List<dynamic>?)
+      ?.map((e) => BaseItemPerson.fromJson(Map<String, dynamic>.from(e as Map)))
+      .toList(),
 )..finampOffline = json['FinampOffline'] as bool?;
 
 Map<String, dynamic> _$BaseItemDtoToJson(
@@ -4126,6 +4136,9 @@ Map<String, dynamic> _$BaseItemDtoToJson(
   if (instance.audio case final value?) 'Audio': value,
   if (instance.normalizationGain case final value?) 'NormalizationGain': value,
   if (instance.hasLyrics case final value?) 'HasLyrics': value,
+  if (instance.displayComposer case final value?) 'DisplayComposer': value,
+  if (instance.composerItems?.map((e) => e.toJson()).toList() case final value?)
+    'ComposerItems': value,
   if (instance.finampOffline case final value?) 'FinampOffline': value,
 };
 
