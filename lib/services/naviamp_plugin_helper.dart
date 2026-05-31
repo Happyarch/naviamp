@@ -53,8 +53,15 @@ class NaviampPluginHelper {
       final body = jsonDecode(response.body) as Map<String, dynamic>?;
       if (body == null) return null;
 
-      final version = body['version'] as String?;
-      final featureList = body['features'] as List<dynamic>?;
+      // The sidecar wraps all responses in the standard Subsonic envelope:
+      //   { "subsonic-response": { "status": "ok", "capabilities": { "version": ..., "features": [...] } } }
+      final inner = body['subsonic-response'] as Map<String, dynamic>?;
+      if (inner == null || inner['status'] != 'ok') return null;
+      final caps = inner['capabilities'] as Map<String, dynamic>?;
+      if (caps == null) return null;
+
+      final version = caps['version'] as String?;
+      final featureList = caps['features'] as List<dynamic>?;
       if (version == null || featureList == null) return null;
 
       return NaviampPluginInfo(
