@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
+import '../models/finamp_models.dart';
 import '../models/jellyfin_models.dart';
 import '../models/subsonic_models.dart';
 import 'subsonic_api.dart';
@@ -72,14 +73,30 @@ class SubsonicApiHelper {
 
   // ── Artists ───────────────────────────────────────────────────────────────
 
-  Future<List<BaseItemDto>> getArtists({int? musicFolderId}) async {
+  Future<List<BaseItemDto>> getArtists({int? musicFolderId, ArtistType? artistType}) async {
     final inner = _unwrap(await _api.getArtists(musicFolderId: musicFolderId));
     final data = SubsonicArtistsID3.fromJson(inner['artists'] as Map<String, dynamic>);
     return [
       for (final index in data.index ?? <SubsonicIndexID3>[])
         for (final artist in index.artist ?? <SubsonicArtistID3>[])
-          _artistToDto(artist),
+          if (_matchesArtistType(artist, artistType)) _artistToDto(artist),
     ];
+  }
+
+  static bool _matchesArtistType(SubsonicArtistID3 artist, ArtistType? artistType) {
+    if (artistType == null) return true;
+    final roles = artist.roles;
+    if (roles != null && roles.isNotEmpty) {
+      return switch (artistType) {
+        ArtistType.albumArtist => roles.contains('albumartist'),
+        ArtistType.artist => roles.contains('artist'),
+      };
+    }
+    // Fallback when server doesn't send roles: use albumCount as a proxy.
+    return switch (artistType) {
+      ArtistType.albumArtist => (artist.albumCount ?? 0) > 0,
+      ArtistType.artist => (artist.albumCount ?? 0) == 0,
+    };
   }
 
   /// Returns (artist, albums). Call when opening an artist detail page.

@@ -307,8 +307,21 @@ class JellyfinApiHelper {
     }
 
     // 4. Artist children (albums or tracks).
+    // Navidrome's getArtist returns ALL associated albums — both albums where
+    // the artist is the album artist AND albums where they appear as a track
+    // contributor.  We split by checking whether the artist ID appears in each
+    // album's albumArtists list.
     if (parentItem?.type == 'MusicArtist') {
-      final (_, albums) = await sub.getArtist(parentItem!.id.raw);
+      final artistId = parentItem!.id.raw;
+      final (_, allAlbums) = await sub.getArtist(artistId);
+
+      bool isOwnAlbum(BaseItemDto a) =>
+          a.albumArtists?.any((aa) => aa.id?.raw == artistId) ?? true;
+
+      final albums = (artistType == ArtistType.artist)
+          ? allAlbums.where((a) => !isOwnAlbum(a)).toList()
+          : allAlbums.where(isOwnAlbum).toList();
+
       if (includeItemTypes == 'MusicAlbum') {
         var filtered = genreFilter != null
             ? albums.where((a) => a.genres?.contains(genreFilter.name) ?? false).toList()
@@ -317,8 +330,9 @@ class JellyfinApiHelper {
         final sorted = _subsonicSort(filtered, sortBy, sortOrder);
         return QueryResult_BaseItemDto(items: sorted, totalRecordCount: sorted.length, startIndex: 0);
       } else if (includeItemTypes == 'Audio') {
-        // Expand each album to get its tracks.
-        final trackLists = await Future.wait(albums.map((a) => sub.getAlbum(a.id.raw).then((r) => r.$2)));
+        final trackLists = await Future.wait(
+          albums.map((a) => sub.getAlbum(a.id.raw).then((r) => r.$2).catchError((_) => <BaseItemDto>[])),
+        );
         var songs = trackLists.expand((l) => l).toList();
         if (genreFilter != null) {
           songs = songs.where((s) => s.genres?.contains(genreFilter.name) ?? false).toList();
@@ -389,7 +403,7 @@ class JellyfinApiHelper {
     // 8. Top-level browse by item type.
     switch (includeItemTypes) {
       case 'MusicArtist':
-        final all = await sub.getArtists(musicFolderId: musicFolderId);
+        final all = await sub.getArtists(musicFolderId: musicFolderId, artistType: ArtistType.albumArtist);
         final sorted = _subsonicSort(all, sortBy, sortOrder);
         final page = _subsonicPaginate(sorted, startIndex, limit);
         return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
@@ -1296,47 +1310,46 @@ class JellyfinApiHelper {
     return LyricDto.fromJson(response as Map<String, dynamic>);
   }
 
-  /// Removes the current user from the DB and revokes the token on Jellyfin
+  /// Removes the current user from the DB and revokes the token on Jellyfin.
+  /// For Subsonic (Navidrome) sessions the protocol has no logout endpoint, so
+  /// the server call is skipped and only local state is cleared.
   Future<void> logoutCurrentUser() async {
     Response<dynamic>? response;
 
-    // We put this in a try-catch loop that basically ignores errors so that the
-    // user can still log out during scenarios like wrong IP, no internet etc.
+    if (!GetIt.instance<SubsonicUserHelper>().hasCredentials) {
+      // We put this in a try-catch loop that basically ignores errors so that the
+      // user can still log out during scenarios like wrong IP, no internet etc.
+      try {
+        response = await jellyfinApi
+            .logout()
+            // This is required for logout ontimeout method to be correct type
+            .then((e) => e as Response<dynamic>?)
+            .timeout(
+              const Duration(seconds: 3),
+              onTimeout: () {
+                _jellyfinApiHelperLogger.warning(
+                  "Logout request timed out. Logging out anyway, but be aware that Jellyfin may have not got the signal.",
+                );
+                return null;
+              },
+            );
+      } catch (e) {
+        _jellyfinApiHelperLogger.warning(
+          "Jellyfin logout failed with error $e. Logging out anyway, but be aware that Jellyfin may have not got the signal.",
+          e,
+        );
+      }
 
-    try {
-      response = await jellyfinApi
-          .logout()
-          // This is required for logout ontimeout method to be correct type
-          .then((e) => e as Response<dynamic>?)
-          .timeout(
-            const Duration(seconds: 3),
-            onTimeout: () {
-              _jellyfinApiHelperLogger.warning(
-                "Logout request timed out. Logging out anyway, but be aware that Jellyfin may have not got the signal.",
-              );
-              return null;
-            },
-          );
-    } catch (e) {
-      _jellyfinApiHelperLogger.warning(
-        "Jellyfin logout failed with error $e. Logging out anyway, but be aware that Jellyfin may have not got the signal.",
-        e,
-      );
-    } finally {
       // If the logout response wasn't successful, warn the user in the logs.
-      // We continue anyway since this will mostly be for when the client becomes
-      // unauthorised, which will return 401.
       if (response?.isSuccessful == false) {
         _jellyfinApiHelperLogger.warning(
           "Jellyfin logout returned ${response!.statusCode}. Logging out anyway, but be aware that Jellyfin may still consider this device logged in.",
         );
       }
-
-      // If we're unauthorised, the logout command will fail but we're already
-      // basically logged out so we shouldn't fail.
-      _finampUserHelper.removeUser(_finampUserHelper.currentUser!.id);
-      _jellyfinApiHelperLogger.warning("User has completed logout.");
     }
+
+    _finampUserHelper.removeUser(_finampUserHelper.currentUser!.id);
+    _jellyfinApiHelperLogger.warning("User has completed logout.");
   }
 
   Future<bool> _pingSpecificServer(String url) async {

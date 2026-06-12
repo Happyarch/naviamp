@@ -203,7 +203,7 @@ The sidecar runs on a separate port (default `:8090`) but is exposed to clients 
 
 ```
 :4533 {
-    handle_path /naviamp* {
+    handle /naviamp* {
         reverse_proxy naviamp-sidecar:8090
     }
     handle /* {

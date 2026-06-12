@@ -57,11 +57,11 @@ class ItemCollectionListTile extends ConsumerWidget {
             artistType: ref.watch(finampSettingsProvider.defaultArtistType),
           )
         : null;
-    final itemDownloadStub = isArtistOrGenre
+    final itemDownloadStub = isArtistOrGenre && library != null
         ? DownloadStub.fromFinampCollection(
             FinampCollection(type: FinampCollectionType.collectionWithLibraryFilter, library: library, item: item),
           )
-        : DownloadStub.fromItem(type: DownloadItemType.collection, item: item);
+        : DownloadStub.fromItem(type: itemType.downloadType ?? DownloadItemType.collection, item: item);
     final downloadedIndicator = DownloadedIndicator(
       item: itemDownloadStub,
       size: Theme.of(context).textTheme.bodyMedium!.fontSize! + 1,
