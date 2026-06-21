@@ -8,7 +8,6 @@ import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/services/http_aggregate_logging_interceptor.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get_it/get_it.dart';
-import 'package:http/http.dart' show MultipartFile;
 import 'package:http/io_client.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -71,6 +70,10 @@ abstract class JellyfinApi extends ChopperService {
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
   @GET(path: "/Users/Me")
   Future<dynamic> getUser();
+
+  @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
+  @GET(path: "/Users/{id}")
+  Future<dynamic> getUserById(@Path() String id);
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
   @Get(path: "/Users/{id}/Views")
@@ -172,6 +175,15 @@ abstract class JellyfinApi extends ChopperService {
 
     /// Optional. Controls if multi-disc should be returned as separate albums (true) or as a single album (false).
     @Query("CollapseBoxSetItems") bool? collapseMultiDiscAlbums,
+
+    /// Optional. Filter by items whose name is sorted equally than a given input string.
+    @Query("NameStartsWith") String? nameStartsWith,
+
+    /// Optional. Filter by items whose name is sorted equally or greater than a given input string.
+    @Query("NameStartsWithOrGreater") String? nameStartsWithOrGreater,
+
+    /// Optional. Filter by items whose name is equally or lesser than a given input string.
+    @Query("NameLessThan") String? nameLessThan,
   });
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
@@ -417,6 +429,9 @@ abstract class JellyfinApi extends ChopperService {
 
     /// Optional filter by items that are marked as favorite, or not.
     @Query("isFavorite") bool? isFavorite,
+
+    /// Optional. Filter by items whose name is sorted equally than a given input string.
+    @Query("NameStartsWith") String? nameStartsWith,
   });
 
   @FactoryConverter(request: JsonConverter.requestFactory, response: JsonConverter.responseFactory)
@@ -461,6 +476,9 @@ abstract class JellyfinApi extends ChopperService {
 
     /// Optional filter by items that are marked as favorite, or not.
     @Query("isFavorite") bool? isFavorite,
+
+    /// Optional. Filter by items whose name is sorted equally than a given input string.
+    @Query("NameStartsWith") String? nameStartsWith,
   });
 
   /// Gets all genres from a given item, folder, or the entire library.

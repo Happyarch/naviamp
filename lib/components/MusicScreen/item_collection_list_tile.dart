@@ -34,7 +34,7 @@ class ItemCollectionListTile extends ConsumerWidget {
   });
 
   final BaseItemDto item;
-  final String? parentType;
+  final ContentType? parentType;
   final void Function()? onTap;
   final bool albumShowsYearAndDurationInstead;
   final SortBy? adaptiveAdditionalInfoSortBy;
@@ -47,7 +47,6 @@ class ItemCollectionListTile extends ConsumerWidget {
     final finampUserHelper = GetIt.instance<FinampUserHelper>();
     final library = finampUserHelper.currentUser?.currentView;
     final itemType = BaseItemDtoType.fromItem(item);
-    final isArtistOrGenre = (itemType == BaseItemDtoType.artist || itemType == BaseItemDtoType.genre);
     final isOnDesktop = Platform.isMacOS || Platform.isWindows || Platform.isLinux;
     final subtitle = (itemType != BaseItemDtoType.album || !albumShowsYearAndDurationInstead)
         ? generateSubtitle(
@@ -57,6 +56,7 @@ class ItemCollectionListTile extends ConsumerWidget {
             artistType: ref.watch(finampSettingsProvider.defaultArtistType),
           )
         : null;
+    final isArtistOrGenre = itemType == BaseItemDtoType.artist || itemType == BaseItemDtoType.genre;
     final itemDownloadStub = isArtistOrGenre && library != null
         ? DownloadStub.fromFinampCollection(
             FinampCollection(type: FinampCollectionType.collectionWithLibraryFilter, library: library, item: item),
@@ -100,9 +100,9 @@ class ItemCollectionListTile extends ConsumerWidget {
       );
     }
 
-    TabContentType? associatedTabContentType;
+    ContentType? associatedTabContentType;
     try {
-      associatedTabContentType = TabContentType.fromItemType(itemType.jellyfinName ?? "");
+      associatedTabContentType = ContentType.fromItemType(itemType.jellyfinName ?? "Collection");
     } on FormatException {
       associatedTabContentType = null;
     }
@@ -110,8 +110,7 @@ class ItemCollectionListTile extends ConsumerWidget {
     final tileAdditionalInfoSetting = associatedTabContentType != null
         ? ref.watch(finampSettingsProvider.tileAdditionalInfoType(associatedTabContentType))
         : null;
-    final tileAdditionalInfoType =
-        (associatedTabContentType == TabContentType.albums && albumShowsYearAndDurationInstead)
+    final tileAdditionalInfoType = (associatedTabContentType == ContentType.albums && albumShowsYearAndDurationInstead)
         ? TileAdditionalInfoType.none
         : (tileAdditionalInfoSetting ?? TileAdditionalInfoType.adaptive);
 

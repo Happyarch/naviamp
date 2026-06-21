@@ -1,12 +1,9 @@
-import 'dart:math';
-
 import 'package:finamp/components/AddToPlaylistScreen/add_to_playlist_button.dart';
 import 'package:finamp/components/PlayerScreen/album_chip.dart';
 import 'package:finamp/components/PlayerScreen/artist_chip.dart';
 import 'package:finamp/components/PlayerScreen/composer_chip.dart';
 import 'package:finamp/components/PlayerScreen/player_buttons_more.dart';
 import 'package:finamp/l10n/app_localizations.dart';
-import 'package:finamp/models/finamp_models.dart';
 import 'package:finamp/models/jellyfin_models.dart' as jellyfin_models;
 import 'package:finamp/screens/player_screen.dart';
 import 'package:finamp/services/finamp_settings_helper.dart';
@@ -52,7 +49,7 @@ class TrackNameContent extends ConsumerWidget {
                 final textStyle = TextStyle(
                   fontSize: 20,
                   height: 1.2,
-                  fontWeight: Theme.brightnessOf(context) == Brightness.light ? FontWeight.w500 : FontWeight.w600,
+                  fontWeight: Theme.brightnessOf(context) == Brightness.light ? FontWeight.w500 : FontWeight.w500,
                 );
 
                 final textSpan = TextSpan(text: text, style: textStyle);
@@ -119,7 +116,7 @@ class TrackNameContent extends ConsumerWidget {
           child: Container(
             constraints: const BoxConstraints(maxWidth: 280),
             child: AlbumChips(
-              baseItem: trackBaseItemDto!,
+              baseItem: trackBaseItemDto,
               backgroundColor: IconTheme.of(context).color!.withOpacity(0.1),
               key: trackBaseItemDto.album == null ? null : ValueKey("${trackBaseItemDto.album}-album"),
             ),

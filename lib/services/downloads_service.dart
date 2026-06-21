@@ -1400,7 +1400,7 @@ class DownloadsService {
   Future<List<BaseItemDto>> getCollectionTracks(
     BaseItemDto item, {
     bool playable = true,
-    BaseItemDto? genreFilter,
+    BaseItemId? genreFilter,
     bool onlyFavorites = false,
   }) async {
     List<int> favoriteIds = [];
@@ -1427,8 +1427,7 @@ class DownloadsService {
         .optional(
           genreFilter != null,
           (q) => q.infoFor(
-            (q) =>
-                q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.id.raw, DownloadItemType.collection))),
+            (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.raw, DownloadItemType.collection))),
           ),
         );
 
@@ -1455,7 +1454,7 @@ class DownloadsService {
     BaseItemId? viewFilter,
     bool nullableViewFilters = true,
     bool onlyFavorites = false,
-    BaseItemDto? genreFilter,
+    BaseItemId? genreFilter,
   }) {
     List<int> favoriteIds = [];
     if (onlyFavorites) {
@@ -1478,7 +1477,7 @@ class DownloadsService {
         // Returns items that have a certain genreId assigned
         .optional(
           genreFilter != null,
-          (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.id.raw, DownloadItemType.collection))),
+          (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.raw, DownloadItemType.collection))),
         )
         .optional(
           viewFilter != null,
@@ -1513,7 +1512,7 @@ class DownloadsService {
   /// Get all downloaded collections.  Used for non-tracks tabs on music screen and
   /// on artist/genre screens.  Can have one or more filters applied:
   /// + nameFilter - only return collections containing nameFilter in their name, case insensitive.
-  /// + baseTypeFilter - only return collections of the given BaseItemDto type.
+  /// + includeItemTypes - only return collections of the given BaseItemDto types.
   /// + relatedTo - only return collections containing tracks which have relatedTo as
   /// their artist, album, or genre.
   /// + fullyDownloaded - only return collections which are fully downloaded.  Artists/genres
@@ -1526,7 +1525,7 @@ class DownloadsService {
   /// + genreFilter - only return albums that have the provided genre id assigned
   Future<List<DownloadStub>> getAllCollections({
     String? nameFilter,
-    BaseItemDtoType? baseTypeFilter,
+    List<BaseItemDtoType> includeItemTypes = const [],
     BaseItemDto? relatedTo,
     bool fullyDownloaded = false,
     BaseItemId? viewFilter,
@@ -1535,11 +1534,11 @@ class DownloadsService {
     bool onlyFavorites = false,
     BaseItemDtoType? infoForType,
     ArtistType? artistType,
-    BaseItemDto? genreFilter,
+    BaseItemId? genreFilter,
   }) {
     List<int> favoriteIds = [];
     List<int> libraryFilteredIds = [];
-    if (onlyFavorites && baseTypeFilter != BaseItemDtoType.genre) {
+    if (onlyFavorites && !includeItemTypes.contains(BaseItemDtoType.genre)) {
       favoriteIds = _getFavoriteIds() ?? [];
     }
     if (fullyDownloaded) {
@@ -1568,15 +1567,17 @@ class DownloadsService {
         .typeEqualTo(DownloadItemType.collection)
         .filter()
         .optional(nameFilter != null, (q) => q.nameContains(nameFilter!, caseSensitive: false))
-        .optional(baseTypeFilter != null, (q) => q.baseItemTypeEqualTo(baseTypeFilter!))
+        .optional(
+          includeItemTypes.isNotEmpty,
+          (q) => q.anyOf(includeItemTypes, (q, type) => q.baseItemTypeEqualTo(type)),
+        )
         // If allPlaylists is info downloaded, we may have info for empty
         // playlists.  We should only return playlists with at least 1 required
         // track in them.
         .optional(
-          baseTypeFilter == BaseItemDtoType.playlist,
+          includeItemTypes.contains(BaseItemDtoType.playlist),
           (q) => q.info((q) => q.typeEqualTo(DownloadItemType.track).requiredByIsNotEmpty()),
         )
-        // Returns albums where the artist (relatedTo) is an Album Artist
         .optional(
           artistType == ArtistType.albumArtist && relatedTo != null,
           (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(relatedTo!.id.raw, DownloadItemType.collection))),
@@ -1592,8 +1593,7 @@ class DownloadsService {
         .optional(
           genreFilter != null,
           (q) => q.infoFor(
-            (q) =>
-                q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.id.raw, DownloadItemType.collection))),
+            (q) => q.info((q) => q.isarIdEqualTo(DownloadStub.getHash(genreFilter!.raw, DownloadItemType.collection))),
           ),
         )
         .optional(

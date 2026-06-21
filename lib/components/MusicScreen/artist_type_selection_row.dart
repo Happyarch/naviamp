@@ -1,12 +1,16 @@
+import 'dart:io';
+
+import 'package:finamp/l10n/app_localizations.dart';
+import 'package:finamp/models/finamp_models.dart';
+import 'package:finamp/services/finamp_settings_helper.dart';
+import 'package:finamp/services/naviamp_plugin_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../models/finamp_models.dart';
-
 class ArtistTypeSelectionRow extends ConsumerWidget {
-  final TabContentType tabType;
+  final ContentType tabType;
   final ArtistType defaultArtistType;
-  final void Function(TabContentType) refreshTab;
+  final void Function(ContentType) refreshTab;
 
   const ArtistTypeSelectionRow({
     super.key,
@@ -17,6 +21,72 @@ class ArtistTypeSelectionRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SizedBox.shrink();
+    final pluginState = ref.watch(naviampPluginProvider);
+    final hasPerformingArtists = pluginState is NaviampPluginPresent &&
+        pluginState.supports("performing-artists");
+
+    if (!hasPerformingArtists) {
+      return const SizedBox.shrink();
+    }
+
+    if (tabType == ContentType.genericArtists) {
+      double screenWidth = MediaQuery.widthOf(context);
+      bool alignLeft = screenWidth > 600;
+
+      return SafeArea(
+        top: false,
+        bottom: false,
+        child: Padding(
+          padding: (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+              ? const EdgeInsets.symmetric(horizontal: 4)
+              : EdgeInsets.zero,
+          child: SizedBox(
+            height: 48,
+            width: double.infinity,
+            child: Row(
+              mainAxisAlignment: alignLeft ? MainAxisAlignment.start : MainAxisAlignment.center,
+              children: [
+                FilterChip(
+                  label: Text(AppLocalizations.of(context)!.albumArtists),
+                  onSelected: (_) {
+                    FinampSetters.setDefaultArtistType(ArtistType.albumArtist);
+                    refreshTab(tabType);
+                  },
+                  selected: defaultArtistType == ArtistType.albumArtist,
+                  showCheckmark: false,
+                  selectedColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  labelStyle: TextStyle(
+                    color: defaultArtistType == ArtistType.albumArtist
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                  shape: const StadiumBorder(),
+                ),
+                const SizedBox(width: 8),
+                FilterChip(
+                  label: Text(AppLocalizations.of(context)!.performingArtists),
+                  onSelected: (_) {
+                    FinampSetters.setDefaultArtistType(ArtistType.artist);
+                    refreshTab(tabType);
+                  },
+                  selected: defaultArtistType == ArtistType.artist,
+                  showCheckmark: false,
+                  selectedColor: Theme.of(context).colorScheme.primary,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  labelStyle: TextStyle(
+                    color: defaultArtistType == ArtistType.artist
+                        ? Theme.of(context).colorScheme.onPrimary
+                        : Theme.of(context).colorScheme.onSurface,
+                  ),
+                  shape: const StadiumBorder(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 }

@@ -15,7 +15,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 0.9.23+123
+version: 0.9.24+124
 
 environment:
   sdk: ^3.9.0
@@ -80,7 +80,7 @@ dependencies:
   permission_handler: ^12.0.0
   provider: ^6.0.5
   uuid: ^4.5.1
-  infinite_scroll_pagination: ^4.0.0
+  infinite_scroll_pagination: ^5.0.0
   flutter_sticky_header: ^0.8.0
   # TODO: switch to regular `flutter_user_certificates_android` when this PR is
   # merged:
@@ -154,6 +154,10 @@ dependencies:
   dynamic_color: ^1.8.1
   dbus: ^0.7.11
   bits: ^1.4.0
+  flutter_carplay:
+    git:
+      url: https://github.com/oguzhnatly/flutter_carplay.git
+      ref: 017ce2e
   diacritic: ^0.1.6
   flutter_secure_storage: ^9.2.4
 
@@ -260,7 +264,7 @@ msix_config:
   display_name: Naviamp
   publisher_display_name: naviamp
   identity_name: com.naviamp.naviamp
-  msix_version: 0.9.23.0
+  msix_version: 0.9.24.0
   logo_path: ./images/naviamp_cropped.png
   trim_logo: false # don't force logo to be square, it will be stretched
   # backgroundMediaPlayback prevents apps from getting muted or killed when being in the background (won't build if included at the moment)
