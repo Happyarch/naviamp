@@ -241,6 +241,8 @@ class IsarTaskQueue implements TaskQueue {
 
   Completer<void>? _callbacksComplete;
 
+  bool get isRunning => _callbacksComplete != null;
+
   final _isar = GetIt.instance<Isar>();
 
   /// Initialize the queue and start stored downloads.
@@ -451,6 +453,8 @@ class DownloadsDeleteService {
 
   final Set<int> _activeDeletes = {};
   Completer<void>? _callbacksComplete;
+
+  bool get isRunning => _callbacksComplete != null;
 
   DownloadsDeleteService(this._downloadsService) {
     IsarTaskData.globalAge = _isar.isarTaskDatas.where().typeEqualTo(type).sortByAgeDesc().findFirstSync()?.age ?? 0;

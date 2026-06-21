@@ -119,7 +119,7 @@ void main() async {
       await tester.enterText(urlEntry, "https://demo.jellyfin.org/stable");
 
       final serverButton = find.byWidgetPredicate(
-        (x) => x is JellyfinServerSelectionWidget && (x.baseUrl?.contains("demo.jellyfin.org") ?? false),
+        (x) => x is NavidromeServerWidget && (x.baseUrl?.contains("demo.jellyfin.org") ?? false),
       );
       await tester.waitFor(serverButton);
       await tester.tap(serverButton);

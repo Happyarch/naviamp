@@ -274,7 +274,7 @@ class JellyfinApiHelper {
   // Central Subsonic dispatch used by getItems / getItemsWithTotalRecordCount.
   Future<QueryResult_BaseItemDto> _subsonicFetch({
     BaseItemDto? parentItem,
-    BaseItemDto? libraryFilter,
+    BaseItemId? libraryFilter,
     String? includeItemTypes,
     String? sortBy,
     String? sortOrder,
@@ -282,15 +282,34 @@ class JellyfinApiHelper {
     List<BaseItemId>? itemIds,
     String? filters,
     ArtistType? artistType,
-    BaseItemDto? genreFilter,
+    BaseItemId? genreFilter,
     bool? isFavorite,
     int? startIndex,
     int? limit,
+    String? nameStartsWith,
+    String? nameStartsWithOrGreater,
+    String? nameLessThan,
   }) async {
     final sub = GetIt.instance<SubsonicApiHelper>();
-    final musicFolderId =
-        _subsonicMusicFolderId(libraryFilter) ?? _subsonicMusicFolderId(parentItem);
+    final musicFolderId = (libraryFilter != null ? int.tryParse(libraryFilter.raw) : null) ?? _subsonicMusicFolderId(parentItem);
     final isFav = isFavorite == true || filters == 'IsFavorite';
+
+    List<BaseItemDto> applyAlphabeticalFilter(List<BaseItemDto> items) {
+      var filtered = items;
+      if (nameStartsWith != null) {
+        final prefix = nameStartsWith.toLowerCase();
+        filtered = filtered.where((item) => (item.name ?? '').toLowerCase().startsWith(prefix)).toList();
+      }
+      if (nameStartsWithOrGreater != null) {
+        final prefix = nameStartsWithOrGreater.toLowerCase();
+        filtered = filtered.where((item) => (item.name ?? '').toLowerCase().compareTo(prefix) >= 0).toList();
+      }
+      if (nameLessThan != null) {
+        final prefix = nameLessThan.toLowerCase();
+        filtered = filtered.where((item) => (item.name ?? '').toLowerCase().compareTo(prefix) <= 0).toList();
+      }
+      return filtered;
+    }
 
     // 1. Batch item-ID fetch (used by getItemByIdBatched for queue restore).
     if (itemIds != null) {
@@ -312,13 +331,15 @@ class JellyfinApiHelper {
         'Audio' => r.songs,
         _ => [...r.artists, ...r.albums, ...r.songs],
       };
-      return QueryResult_BaseItemDto(items: items, totalRecordCount: items.length, startIndex: 0);
+      final filtered = applyAlphabeticalFilter(items);
+      return QueryResult_BaseItemDto(items: filtered, totalRecordCount: filtered.length, startIndex: 0);
     }
 
     // 3. Playlist children.
     if (parentItem?.type == 'Playlist') {
       final (_, songs) = await sub.getPlaylist(parentItem!.id.raw);
-      return QueryResult_BaseItemDto(items: songs, totalRecordCount: songs.length, startIndex: 0);
+      final filtered = applyAlphabeticalFilter(songs);
+      return QueryResult_BaseItemDto(items: filtered, totalRecordCount: filtered.length, startIndex: 0);
     }
 
     // 4. Artist children (albums or tracks).
@@ -339,10 +360,11 @@ class JellyfinApiHelper {
 
       if (includeItemTypes == 'MusicAlbum') {
         var filtered = genreFilter != null
-            ? albums.where((a) => a.genres?.contains(genreFilter.name) ?? false).toList()
+            ? albums.where((a) => a.genres?.contains(genreFilter.raw) ?? false).toList()
             : albums;
         if (isFav) filtered = filtered.where((a) => a.userData?.isFavorite == true).toList();
-        final sorted = _subsonicSort(filtered, sortBy, sortOrder);
+        final alphaFiltered = applyAlphabeticalFilter(filtered);
+        final sorted = _subsonicSort(alphaFiltered, sortBy, sortOrder);
         return QueryResult_BaseItemDto(items: sorted, totalRecordCount: sorted.length, startIndex: 0);
       } else if (includeItemTypes == 'Audio') {
         final trackLists = await Future.wait(
@@ -350,10 +372,11 @@ class JellyfinApiHelper {
         );
         var songs = trackLists.expand((l) => l).toList();
         if (genreFilter != null) {
-          songs = songs.where((s) => s.genres?.contains(genreFilter.name) ?? false).toList();
+          songs = songs.where((s) => s.genres?.contains(genreFilter.raw) ?? false).toList();
         }
         if (isFav) songs = songs.where((s) => s.userData?.isFavorite == true).toList();
-        final sorted = _subsonicSort(songs, sortBy, sortOrder);
+        final alphaFiltered = applyAlphabeticalFilter(songs);
+        final sorted = _subsonicSort(alphaFiltered, sortBy, sortOrder);
         final page = _subsonicPaginate(sorted, startIndex, limit);
         return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
       }
@@ -362,7 +385,8 @@ class JellyfinApiHelper {
     // 5. Album children (tracks).
     if (parentItem?.type == 'MusicAlbum') {
       final (_, songs) = await sub.getAlbum(parentItem!.id.raw);
-      final sorted = _subsonicSort(songs, sortBy, sortOrder);
+      final alphaFiltered = applyAlphabeticalFilter(songs);
+      final sorted = _subsonicSort(alphaFiltered, sortBy, sortOrder);
       return QueryResult_BaseItemDto(items: sorted, totalRecordCount: sorted.length, startIndex: 0);
     }
 
@@ -374,26 +398,28 @@ class JellyfinApiHelper {
             type: 'byGenre',
             size: limit ?? 5,
             offset: startIndex,
-            genre: genreFilter.name,
+            genre: genreFilter.raw,
             musicFolderId: musicFolderId,
           );
           final filtered = isFav ? albums.where((a) => a.userData?.isFavorite == true).toList() : albums;
+          final alphaFiltered = applyAlphabeticalFilter(filtered);
           return QueryResult_BaseItemDto(
-            items: filtered,
-            totalRecordCount: genreFilter.albumCount ?? filtered.length,
+            items: alphaFiltered,
+            totalRecordCount: alphaFiltered.length,
             startIndex: startIndex ?? 0,
           );
         case 'Audio':
           final songs = await sub.getSongsByGenre(
-            genreFilter.name!,
+            genreFilter.raw,
             count: limit,
             offset: startIndex,
             musicFolderId: musicFolderId,
           );
           final filtered = isFav ? songs.where((s) => s.userData?.isFavorite == true).toList() : songs;
+          final alphaFiltered = applyAlphabeticalFilter(filtered);
           return QueryResult_BaseItemDto(
-            items: filtered,
-            totalRecordCount: genreFilter.songCount ?? filtered.length,
+            items: alphaFiltered,
+            totalRecordCount: alphaFiltered.length,
             startIndex: startIndex ?? 0,
           );
         default:
@@ -410,7 +436,8 @@ class JellyfinApiHelper {
         'Audio' => starred.songs,
         _ => [...starred.artists, ...starred.albums, ...starred.songs],
       };
-      final sorted = _subsonicSort(items, sortBy, sortOrder);
+      final alphaFiltered = applyAlphabeticalFilter(items);
+      final sorted = _subsonicSort(alphaFiltered, sortBy, sortOrder);
       final page = _subsonicPaginate(sorted, startIndex, limit);
       return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
     }
@@ -419,7 +446,8 @@ class JellyfinApiHelper {
     switch (includeItemTypes) {
       case 'MusicArtist':
         final all = await sub.getArtists(musicFolderId: musicFolderId, artistType: ArtistType.albumArtist);
-        final sorted = _subsonicSort(all, sortBy, sortOrder);
+        final alphaFiltered = applyAlphabeticalFilter(all);
+        final sorted = _subsonicSort(alphaFiltered, sortBy, sortOrder);
         final page = _subsonicPaginate(sorted, startIndex, limit);
         return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
 
@@ -432,21 +460,25 @@ class JellyfinApiHelper {
           offset: type == 'random' ? 0 : startIndex,
           musicFolderId: musicFolderId,
         );
-        return QueryResult_BaseItemDto(items: albums, totalRecordCount: albums.length, startIndex: startIndex ?? 0);
+        final alphaFiltered = applyAlphabeticalFilter(albums);
+        return QueryResult_BaseItemDto(items: alphaFiltered, totalRecordCount: alphaFiltered.length, startIndex: startIndex ?? 0);
 
       case 'Audio':
         final songs = await sub.getRandomSongs(size: limit ?? 100, musicFolderId: musicFolderId);
-        return QueryResult_BaseItemDto(items: songs, totalRecordCount: songs.length, startIndex: 0);
+        final alphaFiltered = applyAlphabeticalFilter(songs);
+        return QueryResult_BaseItemDto(items: alphaFiltered, totalRecordCount: alphaFiltered.length, startIndex: 0);
 
       case 'MusicGenre':
         final all = await sub.getGenres();
-        final sorted = _subsonicSort(all, sortBy, sortOrder);
+        final alphaFiltered = applyAlphabeticalFilter(all);
+        final sorted = _subsonicSort(alphaFiltered, sortBy, sortOrder);
         final page = _subsonicPaginate(sorted, startIndex, limit);
         return QueryResult_BaseItemDto(items: page, totalRecordCount: sorted.length, startIndex: startIndex ?? 0);
 
       case 'Playlist':
         final all = await sub.getPlaylists();
-        return QueryResult_BaseItemDto(items: all, totalRecordCount: all.length, startIndex: 0);
+        final alphaFiltered = applyAlphabeticalFilter(all);
+        return QueryResult_BaseItemDto(items: alphaFiltered, totalRecordCount: alphaFiltered.length, startIndex: 0);
 
       default:
         _jellyfinApiHelperLogger.warning('_subsonicFetch: unhandled includeItemTypes=$includeItemTypes');
